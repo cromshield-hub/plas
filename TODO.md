@@ -63,6 +63,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | `examples/config/` | `property_manager` | single/multi-session 로드, 런타임 업데이트 |
 | `examples/hal/` | `device_manager` | 드라이버 등록, 인터페이스 캐스팅, lifecycle |
 | `examples/pci/` | `doe_exchange` | PCI DOE discovery + data exchange (stub) |
+| `examples/pci/` | `topology_walk` | sysfs PCI 토폴로지 탐색 (실제 하드웨어) |
 
 ### Tests
 
@@ -77,7 +78,9 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | HAL (device_factory) | 7 | **Pass** |
 | HAL (device_manager) | 24 | **Pass** |
 | PCI (types, config, doe) | 35 | **Pass** |
-| **합계** | **201** | **All Pass** |
+| PCI (topology) | 22 | **Pass** |
+| PCI (topology integration) | 6 | **Skip** (env-gated) |
+| **합계** | **236** | **All Pass** (230 run + 6 skipped) |
 
 ---
 
@@ -106,6 +109,12 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 - [x] `interface/pci/pci_config.h` — PciConfig ABC: ReadConfig8/16/32, WriteConfig8/16/32, FindCapability, FindExtCapability (2026-02-28)
 - [x] `interface/pci/pci_doe.h` — PciDoe ABC: DoeDiscover, DoeExchange (2026-02-28)
 - [x] PCI 테스트 35개 (types, config, doe) (2026-02-28)
+- [x] `PciTopology` — sysfs 기반 PCI 토폴로지 탐색 및 Remove/Rescan (2026-02-28)
+  - `PciAddress` (domain + Bdf), `PciePortType` enum, `PciDeviceNode` struct
+  - `PciTopology` static class: FindParent, FindRootPort, GetPathToRoot, RemoveDevice, RescanBridge, RescanAll
+  - sysfs symlink → realpath 파싱으로 토폴로지 추출, config binary에서 PCIe cap 읽기
+  - `SetSysfsRoot()` 로 fake sysfs 기반 unit test 22개 + integration test 6개 (env-gated)
+  - `topology_walk` 예제 추가
 - [ ] `interface/pci/cxl.h` — CXL 인터페이스 ABC (CXL IDE-KM, CXL.mem 등)
   - PciDoe를 composition으로 사용, DVSEC 기반 식별
 - [ ] `interface/pci/mctp.h` — MCTP over PCIe VDM 인터페이스 ABC

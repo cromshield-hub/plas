@@ -22,7 +22,7 @@ cd build && ctest --output-on-failure
 - `plas::log` — logger (spdlog backend, compile-time selection)
 - `plas::config` — JSON/YAML config parsing, PropertyManager (config→Properties session mapping)
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
-- `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciConfig, PciDoe)
+- `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciTopology)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
 
 ## CMake Targets
@@ -74,7 +74,7 @@ plas/
 │   ├── config/                ← Config load, ConfigNode tree, PropertyManager
 │   │   └── fixtures/          ← JSON/YAML fixture files
 │   ├── hal/                   ← DeviceManager, driver registration
-│   └── pci/                   ← DOE discovery & exchange
+│   └── pci/                   ← DOE discovery & exchange, topology walk
 ├── apps/
 └── packaging/
 ```
@@ -89,6 +89,28 @@ plas/
 | `config/` | `property_manager` | `plas::config` | Single/multi-session load, runtime update |
 | `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle |
 | `pci/` | `doe_exchange` | `plas::hal_interface` | PCI DOE discovery + data exchange (stub device) |
+| `pci/` | `topology_walk` | `plas::hal_interface` | sysfs PCI topology traversal (real hardware) |
+
+## PCI Topology (sysfs-based)
+- **Class**: `PciTopology` — static utility class for PCI topology traversal and device management
+- **Header**: `components/plas-core/include/plas/hal/interface/pci/pci_topology.h`
+- **Source**: `components/plas-core/src/hal/interface/pci/pci_topology.cpp`
+- **Target**: `plas_hal_interface` (no extra dependencies — pure sysfs file I/O)
+- **New types** (in `types.h`):
+  - `PciAddress{uint16_t domain; Bdf bdf;}` — full PCI address with `ToString()`/`FromString()`
+  - `PciePortType` enum — endpoint, root port, upstream/downstream port, bridges, etc.
+  - `PciDeviceNode` struct — address + port type + bridge flag + sysfs path
+- **API**:
+  - `GetSysfsPath`, `DeviceExists` — sysfs path resolution
+  - `GetDeviceInfo` — read port type and bridge flag from config space binary
+  - `FindParent` — resolve symlink via `realpath()` and parse topology path segments
+  - `FindRootPort` — walk up to find root port
+  - `GetPathToRoot` — full path from device to root (device first, root last)
+  - `RemoveDevice` / `RescanBridge` / `RescanAll` — sysfs remove/rescan writes
+  - `SetSysfsRoot` — override for unit testing with fake sysfs
+- **Config space parsing**: reads binary `/sys/bus/pci/devices/DDDD:BB:DD.F/config` for header type (offset 0x0E) and PCIe capability chain walking (cap ID 0x10, port type bits [7:4])
+- **Unit tests**: 22 tests with fake sysfs directory structure (`test_pci_topology.cpp`)
+- **Integration tests**: Gated by `PLAS_TEST_PCI_TOPOLOGY_BDF` env var (`test_pci_topology_integration.cpp`)
 
 ## PciUtils Driver (optional, requires `libpci-dev`)
 - **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`

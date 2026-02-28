@@ -72,6 +72,17 @@ target_link_libraries(test_pci_doe
     PRIVATE plas::hal_interface GTest::gtest_main)
 gtest_discover_tests(test_pci_doe)
 
+add_executable(test_pci_topology hal/interface/pci/test_pci_topology.cpp)
+target_link_libraries(test_pci_topology
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_pci_topology)
+
+add_executable(test_pci_topology_integration
+    hal/interface/pci/test_pci_topology_integration.cpp)
+target_link_libraries(test_pci_topology_integration
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_pci_topology_integration)
+
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)
     add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)

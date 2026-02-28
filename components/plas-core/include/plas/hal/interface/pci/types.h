@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
+#include "plas/core/result.h"
 #include "plas/core/types.h"
 
 namespace plas::hal::pci {
@@ -86,5 +88,39 @@ constexpr uint8_t kCma = 0x01;
 
 /// DWord-aligned DOE payload.
 using DoePayload = std::vector<core::DWord>;
+
+/// Full PCI address including domain.
+struct PciAddress {
+    uint16_t domain;
+    Bdf bdf;
+
+    /// Format as "DDDD:BB:DD.F".
+    std::string ToString() const;
+
+    /// Parse "DDDD:BB:DD.F" string.
+    static core::Result<PciAddress> FromString(const std::string& str);
+
+    constexpr bool operator==(const PciAddress& other) const {
+        return domain == other.domain && bdf == other.bdf;
+    }
+
+    constexpr bool operator!=(const PciAddress& other) const {
+        return !(*this == other);
+    }
+};
+
+/// PCIe device/port type (from PCIe Capability register bits [7:4]).
+enum class PciePortType : uint8_t {
+    kEndpoint = 0x00,
+    kLegacyEndpoint = 0x01,
+    kRootPort = 0x04,
+    kUpstreamPort = 0x05,
+    kDownstreamPort = 0x06,
+    kPcieToPciBridge = 0x07,
+    kPciToPcieBridge = 0x08,
+    kRcIntegratedEndpoint = 0x09,
+    kRcEventCollector = 0x0A,
+    kUnknown = 0xFF,
+};
 
 }  // namespace plas::hal::pci
