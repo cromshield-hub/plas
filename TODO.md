@@ -24,8 +24,8 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 |------|------|------|
 | `plas_core` (types, error, result, units, byte_buffer, version, properties) | **Done** | Properties: 세션 기반 key-value 스토어, SafeNumericCast |
 | `plas_log` (logger, spdlog backend, pimpl) | **Done** | 싱글톤, PLAS_LOG_* 매크로 |
-| `plas_config` (JSON/YAML auto-detect, PropertyManager) | **Done** | 확장자 기반 포맷 감지, config→Properties 세션 매핑 |
-| `plas_hal_interface` (Device, DeviceFactory, DeviceManager) | **Done** | ABC + 팩토리 패턴 + config→인스턴스 레지스트리 |
+| `plas_config` (JSON/YAML auto-detect, ConfigNode, PropertyManager) | **Done** | 확장자 기반 포맷 감지, ConfigNode 트리 탐색, config→Properties 세션 매핑 |
+| `plas_hal_interface` (Device, DeviceFactory, DeviceManager) | **Done** | ABC + 팩토리 패턴 + config→인스턴스 레지스트리, grouped config 지원 |
 | CMake / FetchContent / install | **Done** | PlasInstall.cmake 포함 |
 | Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버) |
 
@@ -59,12 +59,13 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | Core (error, result, units) | 25 | **Pass** |
 | Core (properties) | 44 | **Pass** |
 | Log | 4 | **Pass** |
-| Config (JSON, YAML) | 10 | **Pass** |
+| Config (JSON, YAML) | 19 | **Pass** |
+| Config (ConfigNode) | 11 | **Pass** |
 | Config (PropertyManager) | 31 | **Pass** |
 | HAL (device_factory) | 7 | **Pass** |
-| HAL (device_manager) | 20 | **Pass** |
+| HAL (device_manager) | 24 | **Pass** |
 | PCI (types, config, doe) | 35 | **Pass** |
-| **합계** | **176** | **All Pass** |
+| **합계** | **201** | **All Pass** |
 
 ---
 
@@ -78,6 +79,14 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - Meyer's singleton, LoadFromConfig/LoadFromEntries, nickname 기반 GetDevice/GetInterface<T>
   - `plas_hal_interface`에 배치, `plas::config` PUBLIC 의존 추가
   - 20개 테스트 (싱글턴, 로드, 조회, 인터페이스 캐스팅, 에러, Reset, lifecycle)
+- [x] `ConfigNode` + Grouped Device Config (2026-02-28)
+  - ConfigNode: pimpl 기반 generic config tree, `plas_config` 타겟에 배치
+  - dot-separated key path 탐색 (`GetSubtree("plas.devices")`) — 공유 config에서 서브트리 추출
+  - Grouped device format: map key = driver name, auto-nickname `{driver}_{index}`, scalar args → string 변환
+  - Config 확장: `LoadFromNode(ConfigNode)`, `LoadFromFile(path, key_path)`
+  - DeviceManager 확장: `LoadFromTree(ConfigNode)`, `LoadFromConfig(path, key_path)`
+  - YAML→JSON 내부 변환, 통합 device_parser (flat+grouped)
+  - 25개 신규 테스트 (ConfigNode 11, Config grouped 9, DeviceManager tree/key_path 4, error 1)
 
 ### P1 — PCI/CXL 확장
 
