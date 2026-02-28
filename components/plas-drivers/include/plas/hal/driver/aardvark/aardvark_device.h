@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 #include "plas/hal/interface/device.h"
@@ -12,7 +13,7 @@ namespace plas::hal::driver {
 class AardvarkDevice : public Device, public I2c {
 public:
     explicit AardvarkDevice(const config::DeviceEntry& entry);
-    ~AardvarkDevice() override = default;
+    ~AardvarkDevice() override;
 
     // Device interface
     core::Result<void> Init() override;
@@ -39,11 +40,19 @@ public:
     static void Register();
 
 private:
+    static bool ParseUri(const std::string& uri, uint16_t& port,
+                         uint16_t& addr);
+
     std::string name_;
     std::string uri_;
     DeviceState state_;
     uint32_t bitrate_;
     int handle_;
+    uint16_t port_;
+    uint16_t default_addr_;
+    bool pullup_enabled_;
+    uint16_t bus_timeout_ms_;
+    std::mutex i2c_mutex_;
 };
 
 }  // namespace plas::hal::driver

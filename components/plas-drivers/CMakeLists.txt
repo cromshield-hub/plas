@@ -20,6 +20,78 @@ target_link_libraries(plas_hal_driver
 )
 
 # ---------------------------------------------------------------------------
+# Optional Aardvark SDK (proprietary, no pkg-config)
+# ---------------------------------------------------------------------------
+option(PLAS_WITH_AARDVARK "Build Aardvark driver with real SDK (requires libaardvark)" ON)
+if(PLAS_WITH_AARDVARK)
+    find_package(Aardvark QUIET)
+endif()
+
+if(Aardvark_FOUND)
+    target_link_libraries(plas_hal_driver PRIVATE Aardvark::Aardvark)
+    target_compile_definitions(plas_hal_driver PUBLIC PLAS_HAS_AARDVARK=1)
+    set(PLAS_HAS_AARDVARK TRUE PARENT_SCOPE)
+    message(STATUS "Aardvark driver: enabled (SDK found)")
+else()
+    set(PLAS_HAS_AARDVARK FALSE PARENT_SCOPE)
+    message(STATUS "Aardvark driver: stub only (SDK not found)")
+endif()
+
+# ---------------------------------------------------------------------------
+# Optional FT4222H SDK (FTDI, proprietary)
+# ---------------------------------------------------------------------------
+option(PLAS_WITH_FT4222H "Build FT4222H driver with real SDK (requires libft4222)" ON)
+if(PLAS_WITH_FT4222H)
+    find_package(FT4222H QUIET)
+endif()
+
+if(FT4222H_FOUND)
+    target_link_libraries(plas_hal_driver PRIVATE FT4222H::FT4222H)
+    target_compile_definitions(plas_hal_driver PUBLIC PLAS_HAS_FT4222H=1)
+    set(PLAS_HAS_FT4222H TRUE PARENT_SCOPE)
+    message(STATUS "FT4222H driver: enabled (SDK found)")
+else()
+    set(PLAS_HAS_FT4222H FALSE PARENT_SCOPE)
+    message(STATUS "FT4222H driver: stub only (SDK not found)")
+endif()
+
+# ---------------------------------------------------------------------------
+# Optional PMU3 SDK (proprietary)
+# ---------------------------------------------------------------------------
+option(PLAS_WITH_PMU3 "Build PMU3 driver with real SDK (requires libpmu3)" ON)
+if(PLAS_WITH_PMU3)
+    find_package(PMU3 QUIET)
+endif()
+
+if(PMU3_FOUND)
+    target_link_libraries(plas_hal_driver PRIVATE PMU3::PMU3)
+    target_compile_definitions(plas_hal_driver PUBLIC PLAS_HAS_PMU3=1)
+    set(PLAS_HAS_PMU3 TRUE PARENT_SCOPE)
+    message(STATUS "PMU3 driver: enabled (SDK found)")
+else()
+    set(PLAS_HAS_PMU3 FALSE PARENT_SCOPE)
+    message(STATUS "PMU3 driver: stub only (SDK not found)")
+endif()
+
+# ---------------------------------------------------------------------------
+# Optional PMU4 SDK (proprietary)
+# ---------------------------------------------------------------------------
+option(PLAS_WITH_PMU4 "Build PMU4 driver with real SDK (requires libpmu4)" ON)
+if(PLAS_WITH_PMU4)
+    find_package(PMU4 QUIET)
+endif()
+
+if(PMU4_FOUND)
+    target_link_libraries(plas_hal_driver PRIVATE PMU4::PMU4)
+    target_compile_definitions(plas_hal_driver PUBLIC PLAS_HAS_PMU4=1)
+    set(PLAS_HAS_PMU4 TRUE PARENT_SCOPE)
+    message(STATUS "PMU4 driver: enabled (SDK found)")
+else()
+    set(PLAS_HAS_PMU4 FALSE PARENT_SCOPE)
+    message(STATUS "PMU4 driver: stub only (SDK not found)")
+endif()
+
+# ---------------------------------------------------------------------------
 # Optional pciutils (libpci) driver
 # ---------------------------------------------------------------------------
 option(PLAS_WITH_PCIUTILS "Build pciutils PCI driver (requires libpci)" ON)

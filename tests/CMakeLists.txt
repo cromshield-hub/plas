@@ -118,6 +118,19 @@ target_link_libraries(test_cxl_mailbox
     PRIVATE plas::hal_interface GTest::gtest_main)
 gtest_discover_tests(test_cxl_mailbox)
 
+# Aardvark driver tests (unit tests always, integration gated by SDK)
+add_executable(test_aardvark_device hal/driver/test_aardvark_device.cpp)
+target_link_libraries(test_aardvark_device
+    PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+gtest_discover_tests(test_aardvark_device)
+
+if(PLAS_HAS_AARDVARK)
+    add_executable(test_aardvark_integration hal/driver/test_aardvark_integration.cpp)
+    target_link_libraries(test_aardvark_integration
+        PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+    gtest_discover_tests(test_aardvark_integration)
+endif()
+
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)
     add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)
