@@ -1,7 +1,7 @@
 # PLAS — Platform Library Across Systems
 
 ## Project Overview
-C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO) with driver implementations for Aardvark, FT4222H, PMU3, and PMU4 devices.
+C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO, PCI Config/DOE) with driver implementations for Aardvark, FT4222H, PMU3, PMU4, and PciUtils devices.
 
 ## Build
 ```bash
@@ -23,7 +23,7 @@ cd build && ctest --output-on-failure
 - `plas::config` — JSON/YAML config parsing, PropertyManager (config→Properties session mapping)
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
 - `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciConfig, PciDoe)
-- `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, etc.)
+- `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
 
 ## CMake Targets
 | Target | Dependencies | Private Deps |
@@ -32,7 +32,7 @@ cd build && ctest --output-on-failure
 | `plas_log` | `plas_core` | spdlog |
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
 | `plas_hal_interface` | `plas_core`, `plas_log`, `plas_config` | |
-| `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | |
+| `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | libpci (optional, for pciutils driver) |
 
 ## Key Design Decisions
 - **Error handling**: `std::error_code` + `Result<T>` (no exceptions)
@@ -40,7 +40,8 @@ cd build && ctest --output-on-failure
 - **Config parsers**: PRIVATE linked, no third-party types in public API
 - **Multi-interface drivers**: Multiple inheritance from pure virtual ABCs
 - **Capability check**: `dynamic_cast` on Device pointer
-- **URI scheme**: `driver://bus:identifier`
+- **URI scheme**: `driver://bus:identifier` (pciutils: `pciutils://DDDD:BB:DD.F`)
+- **Optional drivers**: Conditional build via `pkg_check_modules`; missing system libs → driver skipped
 
 ## Project Structure
 ```
@@ -88,6 +89,16 @@ plas/
 | `config/` | `property_manager` | `plas::config` | Single/multi-session load, runtime update |
 | `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle |
 | `pci/` | `doe_exchange` | `plas::hal_interface` | PCI DOE discovery + data exchange (stub device) |
+
+## PciUtils Driver (optional, requires `libpci-dev`)
+- **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`
+- **Driver name**: `"pciutils"` (config: `driver: pciutils`)
+- **URI**: `pciutils://DDDD:BB:DD.F` (domain:bus:device.function)
+- **Build flag**: `PLAS_WITH_PCIUTILS=ON` (default), auto-detected via `pkg_check_modules(libpci)`
+- **Compile define**: `PLAS_HAS_PCIUTILS=1` when enabled
+- **Config args**: `doe_timeout_ms` (default 1000), `doe_poll_interval_us` (default 100)
+- **DOE**: Full mailbox handshake (Write→GO→Poll Ready→Read) with abort/error recovery
+- **Integration tests**: Gated by `PLAS_TEST_PCIUTILS_BDF` env var (e.g., `0000:03:00.0`)
 
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
