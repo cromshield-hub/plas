@@ -198,16 +198,16 @@ plas/
 - **Location**: `vendor/<sdk>/include/` (headers) + `vendor/<sdk>/<platform>/<arch>/` (prebuilt libs)
 - **Platforms**: `linux/x86_64`, `linux/aarch64`, `windows/x86_64`
 - **CMake Find modules**: `cmake/Find{Aardvark,FT4222H,PMU3,PMU4}.cmake`
-- **Search order**: `vendor/` → `*_ROOT` variable/env → system paths
+- **Search order**: `vendor/` → `*_ROOT` CMake variable only (`NO_DEFAULT_PATH` — no env vars, no system paths)
 - **Build options**: `PLAS_WITH_<SDK>=ON` (default), auto-detected; `PLAS_HAS_<SDK>=1` compile define when found
 - **Behavior when absent**: Driver compiles as stub — lifecycle works, I/O returns `kNotSupported`
 
-| SDK | Find Module | Header | Library | Define |
-|-----|------------|--------|---------|--------|
-| Aardvark | `FindAardvark` | `aardvark.h` | `libaardvark` | `PLAS_HAS_AARDVARK` |
-| FT4222H | `FindFT4222H` | `libft4222.h` | `libft4222` | `PLAS_HAS_FT4222H` |
-| PMU3 | `FindPMU3` | `pmu3.h` | `libpmu3` | `PLAS_HAS_PMU3` |
-| PMU4 | `FindPMU4` | `pmu4.h` | `libpmu4` | `PLAS_HAS_PMU4` |
+| SDK | Find Module | Header | Library | Define | Vendor files |
+|-----|------------|--------|---------|--------|--------------|
+| Aardvark | `FindAardvark` | `aardvark.h` | `libaardvark` | `PLAS_HAS_AARDVARK` | manual — login required at totalphase.com |
+| FT4222H | `FindFT4222H` | `libft4222.h` | `libft4222` + `libftd2xx` | `PLAS_HAS_FT4222H` | bundled — FT4222H v1.4.4.232, D2XX v1.4.34 |
+| PMU3 | `FindPMU3` | `pmu3.h` | `libpmu3` | `PLAS_HAS_PMU3` | manual |
+| PMU4 | `FindPMU4` | `pmu4.h` | `libpmu4` | `PLAS_HAS_PMU4` | manual |
 
 ## Aardvark Driver (optional, requires Aardvark SDK)
 - **Class**: `AardvarkDevice` — implements `Device`, `I2c`
@@ -281,7 +281,7 @@ plas/
 4. Add static `Register()` method that calls `DeviceFactory::RegisterDriver()`
 5. Add source to `components/plas-drivers/CMakeLists.txt` (plas_hal_driver target)
 6. If proprietary SDK required:
-   - Create `cmake/Find<Name>.cmake` (search `vendor/` → `*_ROOT` → system)
+   - Create `cmake/Find<Name>.cmake` (search `vendor/` → `*_ROOT` CMake variable, `NO_DEFAULT_PATH`)
    - Add `vendor/<name>/{include, linux/x86_64, windows/x86_64}` directories
    - Add conditional block in `components/plas-drivers/CMakeLists.txt` (`PLAS_WITH_<NAME>` option + find + link + define)
 7. Add `Register()` call to `Bootstrap::RegisterAllDrivers()` in `components/plas-bootstrap/src/bootstrap/bootstrap.cpp` (guarded by `#ifdef PLAS_HAS_<NAME>` if SDK-dependent)
