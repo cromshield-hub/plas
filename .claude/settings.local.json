@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(mkdir -p build && cd build && cmake .. -DPLAS_BUILD_TESTS=ON 2>&1)",
+      "Bash(rm -rf build && mkdir build && cd build && cmake .. -DPLAS_BUILD_TESTS=ON 2>&1)",
+      "Bash(ctest --output-on-failure 2>&1)",
+      "Bash(cmake -B build -DPLAS_BUILD_TESTS=ON 2>&1 | tail -20)",
+      "Bash(cd /home/cromshield/workspace/plas/build && ctest --output-on-failure 2>&1)",
+      "Bash(find /home/cromshield/workspace/plas/tests -type f -name \"*.cpp\" 2>/dev/null | sort)",
+      "Bash(rm -rf build && cmake -B build -DPLAS_BUILD_TESTS=ON -DPLAS_BUILD_EXAMPLES=ON 2>&1)",
+      "Bash(cd /home/cromshield/workspace/plas && git init && git branch -M main)",
+      "Bash(git add -n . 2>&1 | head -80)",
+      "Bash(git add .clang-format .clang-tidy .gitignore CLAUDE.md CMakeLists.txt TODO.md VERSION apps/ cmake/ components/ examples/ packaging/ tests/ todo.md)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nInitial commit: PLAS library with components/ monorepo structure\n\nC++17 hardware backend abstraction library with unified interfaces for\nI2C, I3C, Serial, UART, Power Control, SSD GPIO, and PCI \\(config/DOE\\).\nOrganized under components/plas-core/ with 5 sub-targets \\(core, log,\nconfig, backend_interface, backend_driver\\). 81 tests all passing.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git config user.name \"cromshield\" && git config user.email \"madmaxrun@hanmail.net\")",
+      "Bash(git remote add origin git@github.com:cromshield-hub/plas.git && git push -u origin main)",
+      "Bash(which cmake && cmake --version)",
+      "Bash(which gcc && gcc --version && which g++ && g++ --version)",
+      "Bash(which clang && clang --version 2>&1 | head -5)",
+      "Bash(grep -r \"FetchContent_Declare\\\\|FetchContent_MakeAvailable\" /home/cromshield/workspace/plas --include=\"*.cmake\" 2>/dev/null | grep -v \"build/\")",
+      "Bash(ldd /home/cromshield/workspace/plas/build/lib/libplas_core.so 2>/dev/null | head -20)",
+      "Bash(ldd /home/cromshield/workspace/plas/build/lib/libplas_log.so 2>/dev/null)",
+      "Bash(file /home/cromshield/workspace/plas/build/components/plas-core/libplas* 2>/dev/null)",
+      "Bash(find /home/cromshield/workspace/plas -maxdepth 2 -type f -name \"*.md\" -exec grep -l \"require\\\\|depend\\\\|install\" {} \\\\;)",
+      "Bash(pkg-config --modversion spdlog 2>/dev/null || echo \"spdlog not installed system-wide\")",
+      "Bash(ldd /usr/bin/cmake | head -10)",
+      "Bash(dpkg -l | grep -E \"cmake|gcc|build-essential\" | head -20)",
+      "Bash(dpkg -l | grep -E \"libstdc\\\\+\\\\+|libgcc|libm|libc\" | head -20)",
+      "Bash(ldd /usr/bin/g++ | head -15)",
+      "Bash(chmod +x /home/cromshield/workspace/plas/scripts/docker-build.sh)",
+      "Bash(docker build -t plas-dev .)",
+      "Bash(curl -fsSL https://get.docker.com | sh 2>&1)",
+      "Bash(sudo -n echo \"sudo works without password\" 2>&1 || echo \"sudo requires password\")"
+    ]
+  }
+}
