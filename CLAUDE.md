@@ -19,9 +19,9 @@ ctest --output-on-failure
 - **Standard**: C++17, no exceptions (use `Result<T>`)
 
 ## Namespace Structure
-- `plas::core` — types, error codes, units, byte buffer
+- `plas::core` — types, error codes, units, byte buffer, Properties (session key-value store)
 - `plas::log` — logger (spdlog backend, compile-time selection)
-- `plas::config` — JSON/YAML config parsing
+- `plas::config` — JSON/YAML config parsing, PropertyManager (config→Properties session mapping)
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
 - `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciConfig, PciDoe)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, etc.)

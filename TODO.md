@@ -22,9 +22,9 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 
 | 모듈 | 상태 | 비고 |
 |------|------|------|
-| `plas_core` (types, error, result, units, byte_buffer, version) | **Done** | 전체 구현 |
+| `plas_core` (types, error, result, units, byte_buffer, version, properties) | **Done** | Properties: 세션 기반 key-value 스토어, SafeNumericCast |
 | `plas_log` (logger, spdlog backend, pimpl) | **Done** | 싱글톤, PLAS_LOG_* 매크로 |
-| `plas_config` (JSON/YAML auto-detect) | **Done** | 확장자 기반 포맷 감지 |
+| `plas_config` (JSON/YAML auto-detect, PropertyManager) | **Done** | 확장자 기반 포맷 감지, config→Properties 세션 매핑 |
 | `plas_hal_interface` (Device, DeviceFactory) | **Done** | ABC + 팩토리 패턴 |
 | CMake / FetchContent / install | **Done** | PlasInstall.cmake 포함 |
 | Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버) |
@@ -57,11 +57,13 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | 카테고리 | 테스트 수 | 상태 |
 |----------|----------|------|
 | Core (error, result, units) | 25 | **Pass** |
+| Core (properties) | 44 | **Pass** |
 | Log | 4 | **Pass** |
 | Config (JSON, YAML) | 10 | **Pass** |
+| Config (PropertyManager) | 31 | **Pass** |
 | HAL (device_factory) | 7 | **Pass** |
 | PCI (types, config, doe) | 35 | **Pass** |
-| **합계** | **81** | **All Pass** |
+| **합계** | **156** | **All Pass** |
 
 ---
 
