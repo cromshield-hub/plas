@@ -217,9 +217,9 @@ plas/
 - **Compile define**: `PLAS_HAS_AARDVARK=1` when enabled
 - **Config args**: `bitrate` (Hz, default 100000), `pullup` (true/false, default true), `bus_timeout_ms` (default 200)
 - **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open (aa_open + configure) → kOpen → Close (aa_close) → kClosed
-- **I2C ops**: `aa_i2c_read`, `aa_i2c_write`, `aa_i2c_write_read` — mutex-serialized, length ≤ 0xFFFF
+- **I2C ops**: `aa_i2c_read`, `aa_i2c_write`, `aa_i2c_write_read` — mutex-serialized, length ≤ 0xFFFF; `stop=false` passes `AA_I2C_NO_STOP` flag (Repeated START support)
 - **Error mapping**: SDK error codes → `core::ErrorCode` (kIOError, kTimeout, kNotSupported, kDataLoss)
-- **Unit tests**: 33 tests in `test_aardvark_device.cpp` (always built, no SDK required)
+- **Unit tests**: 35 tests in `test_aardvark_device.cpp` (always built, no SDK required)
 - **Integration tests**: Gated by `PLAS_TEST_AARDVARK_PORT` env var (e.g., `0:0x50`)
 
 ## FT4222H Driver (optional, requires FT4222H + D2XX SDK)
@@ -232,10 +232,10 @@ plas/
 - **SDK dependency**: FT4222H SDK + D2XX (ftd2xx) — both searched by FindFT4222H.cmake
 - **Config args**: `bitrate` (Hz, default 400000), `slave_addr` (7-bit, default 0x40), `sys_clock` (60/24/48/80 MHz, default 60), `rx_timeout_ms` (default 1000), `rx_poll_interval_us` (default 100)
 - **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open (FT_Open both + FT4222_SetClock + I2CMaster_Init + I2CSlave_Init + SetAddress, rollback on failure) → kOpen → Close (UnInitialize + FT_Close both) → kClosed
-- **I2C ops**: Write via master (`FT4222_I2CMaster_Write`), Read via slave polling (`PollSlaveRx` + `FT4222_I2CSlave_Read`), WriteRead = master write + slave poll + slave read — mutex-serialized, length ≤ 0xFFFF
+- **I2C ops**: Write via master (`FT4222_I2CMaster_WriteEx` with `START_AND_STOP` or `START` flag), Read via slave polling (`PollSlaveRx` + `FT4222_I2CSlave_Read`; `stop` param accepted but DUT-controlled), WriteRead = `WriteEx(START)` + slave poll + slave read — mutex-serialized, length ≤ 0xFFFF
 - **PollSlaveRx**: Deadline-based polling of `FT4222_I2CSlave_GetRxStatus` with configurable timeout/interval
 - **Error mapping**: `MapFtStatus(FT_STATUS)` + `MapFt4222Status(FT4222_STATUS)` → `core::ErrorCode`
-- **Unit tests**: 33 tests in `test_ft4222h_device.cpp` (always built, no SDK required)
+- **Unit tests**: 35 tests in `test_ft4222h_device.cpp` (always built, no SDK required)
 - **Integration tests**: Gated by `PLAS_TEST_FT4222H_PORT` env var (e.g., `0:1`)
 
 ## PciUtils Driver (optional, requires `libpci-dev`)
@@ -273,6 +273,18 @@ plas/
 - **Parameters**: `Bdf bdf, uint8_t bar_index (0–5), uint64_t offset`
 - **Implementations**: `PciUtilsDevice` (sysfs resource mmap)
 - **Tests**: `test_pci_bar.cpp` (13 tests) — mock device pattern
+
+## I3c Interface (header-only ABC)
+- **Header**: `components/plas-core/include/plas/hal/interface/i3c.h`
+- **Target**: `plas_hal_interface` (header-only, no source file)
+- **Namespace**: `plas::hal`
+- **API**:
+  - `Read(addr, data, len, stop=true)` / `Write(addr, data, len, stop=true)` — `stop=false` suppresses STOP condition for Repeated START sequences
+  - `SendBroadcastCcc(ccc_id, data, len)` — broadcast CCC to all bus devices, no response (renamed from `SendCcc`)
+  - `SendDirectCcc(ccc_id, addr, data, len)` — direct CCC SET to a specific device, no response
+  - `RecvDirectCcc(ccc_id, addr, data, len)` — direct CCC GET from a specific device
+  - `SetFrequency(freq)` — set I3C bus frequency
+- **Note**: No driver implementation yet; interface defined for future driver authors
 
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
