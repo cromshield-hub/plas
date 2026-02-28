@@ -1,0 +1,7 @@
+session_a:
+  key1: "value1"
+  key2: 42
+
+session_b:
+  key3: true
+  key4: 3.14

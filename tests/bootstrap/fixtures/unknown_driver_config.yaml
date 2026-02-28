@@ -1,0 +1,12 @@
+devices:
+  - nickname: aardvark0
+    driver: aardvark
+    uri: "aardvark://0:0x50"
+
+  - nickname: fake0
+    driver: nonexistent_driver
+    uri: "fake://0:0"
+
+  - nickname: aardvark1
+    driver: aardvark
+    uri: "aardvark://1:0x48"

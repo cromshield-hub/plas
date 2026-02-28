@@ -29,6 +29,7 @@ include(PlasDependencies)
 # Library modules
 add_subdirectory(components/plas-core)
 add_subdirectory(components/plas-drivers)
+add_subdirectory(components/plas-bootstrap)
 
 # Tests
 if(PLAS_BUILD_TESTS)

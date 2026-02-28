@@ -1,0 +1,9 @@
+plas:
+  devices:
+    aardvark:
+      - nickname: eeprom
+        uri: "aardvark://0:0x50"
+        bitrate: 400000
+
+      - nickname: sensor
+        uri: "aardvark://1:0x48"

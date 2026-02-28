@@ -144,6 +144,15 @@ if(PLAS_HAS_FT4222H)
     gtest_discover_tests(test_ft4222h_integration)
 endif()
 
+# Bootstrap tests
+add_executable(test_bootstrap bootstrap/test_bootstrap.cpp)
+target_link_libraries(test_bootstrap
+    PRIVATE plas::bootstrap GTest::gtest_main)
+gtest_discover_tests(test_bootstrap)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/bootstrap/fixtures/
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
+
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)
     add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)

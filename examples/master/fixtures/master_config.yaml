@@ -1,0 +1,26 @@
+##
+## Master example config — two Aardvark I2C adapters + one NVMe SSD (pciutils).
+##
+## Adjust URIs and args to match your actual hardware before running.
+##
+
+plas:
+  devices:
+    aardvark:
+      - nickname: eeprom_reader
+        uri: "aardvark://0:0x50"
+        bitrate: 400000
+        pullup: true
+        bus_timeout_ms: 200
+
+      - nickname: sensor_bus
+        uri: "aardvark://1:0x48"
+        bitrate: 100000
+        pullup: true
+        bus_timeout_ms: 500
+
+    pciutils:
+      - nickname: nvme0
+        uri: "pciutils://0000:03:00.0"
+        doe_timeout_ms: 2000
+        doe_poll_interval_us: 200

@@ -27,8 +27,9 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | `plas_config` (JSON/YAML auto-detect, ConfigNode, PropertyManager) | **Done** | 확장자 기반 포맷 감지, ConfigNode 트리 탐색, config→Properties 세션 매핑 |
 | `plas_hal_interface` (Device, DeviceFactory, DeviceManager) | **Done** | ABC + 팩토리 패턴 + config→인스턴스 레지스트리, grouped config 지원 |
 | CMake / FetchContent / install | **Done** | PlasInstall.cmake 포함 |
-| Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버) |
+| Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버), plas-bootstrap (초기화 헬퍼) |
 | Vendor SDK 동봉 (`vendor/`) | **Done** | 플랫폼/아키텍처별 SDK 번들링, CMake Find 모듈 자동 탐색 |
+| `plas_bootstrap` (Bootstrap 초기화 헬퍼) | **Done** | 단일 Init/Deinit으로 드라이버 등록→설정→디바이스 생성/열기 자동화, graceful degradation |
 
 ### Interfaces (ABC 정의)
 
@@ -49,7 +50,8 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | 드라이버 | 구현 인터페이스 | 상태 |
 |----------|----------------|------|
 | AardvarkDevice | Device, I2c | **Done** — SDK 있으면 실제 I2C, 없으면 stub (33 unit + 6 integration tests) |
-| Ft4222hDevice | Device, I2c | **Stub** — lifecycle만 동작, I2C R/W는 kNotSupported |
+| Ft4222hDevice | Device, I2c | **Done** — SDK 있으면 실제 I2C master+slave, 없으면 stub (33 unit + 7 integration tests) |
+| PciUtilsDevice | Device, PciConfig, PciDoe | **Done** — libpci 있으면 실제 PCI config R/W + DOE, 없으면 빌드 제외 (14 unit + integration tests) |
 | Pmu3Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
 | Pmu4Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
 
@@ -65,6 +67,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | `examples/hal/` | `device_manager` | 드라이버 등록, 인터페이스 캐스팅, lifecycle |
 | `examples/pci/` | `doe_exchange` | PCI DOE discovery + data exchange (stub) |
 | `examples/pci/` | `topology_walk` | sysfs PCI 토폴로지 탐색 (실제 하드웨어) |
+| `examples/master/` | `master_example` | Bootstrap 기반 end-to-end 데모 (config→devices→I2C+PCI) |
 
 ### Tests
 
@@ -88,7 +91,12 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | CXL (types, cxl, mailbox) | 40 | **Pass** |
 | HAL (aardvark unit) | 33 | **Pass** |
 | HAL (aardvark integration) | 6 | **Skip** (env-gated, `PLAS_TEST_AARDVARK_PORT`) |
-| **합계** | **369** | **All Pass** (363 run + 6 skipped) |
+| HAL (ft4222h unit) | 33 | **Pass** |
+| HAL (ft4222h integration) | 7 | **Skip** (env-gated, `PLAS_TEST_FT4222H_PORT`) |
+| HAL (pciutils unit) | 14 | **Skip** (libpci 필요) |
+| HAL (pciutils integration) | — | **Skip** (env-gated, `PLAS_TEST_PCIUTILS_BDF`) |
+| Bootstrap | 40 | **Pass** |
+| **합계** | **442** | **All Pass** (436 run + 6 skipped) |
 
 ---
 
@@ -127,16 +135,32 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - CXL DVSEC types/enums, Cxl ABC (6 methods), CxlMailbox ABC (5 methods)
   - IDE-KM types (타입만, ABC 없음), 40 tests (types 13 + cxl 15 + mailbox 12)
   - 추후 use case 확보 시 driver 구현체 마무리
-- [ ] PCI 드라이버 구현체 (대상 하드웨어 미정)
+- [x] PciUtils PCI 드라이버 구현 (2026-02-28)
+  - `pciutils://DDDD:BB:DD.F`, libpci 기반 PCI config R/W + DOE mailbox 전체 핸드셰이크
+  - 14 unit tests + integration tests (PLAS_TEST_PCIUTILS_BDF env-gated)
 
 > **Note**: MCTP over PCIe VDM (`mctp.h`) — sideband transport 결정 보류. CXL 2.0은 DOE/mailbox 기반, MCTP는 별도 sideband (SMBus/I3C/PCIe VDM) 선택 후 진행.
+
+### P1 — 앱 초기화
+
+- [x] `Bootstrap` 클래스 (`plas_bootstrap` 컴포넌트) (2026-02-28)
+  - `BootstrapConfig`로 설정, 단일 `Init()` 호출로 드라이버 등록→로거→프로퍼티→config 파싱→디바이스 생성/init/open 자동화
+  - `RegisterAllDrivers()` — `#ifdef` 가드 내부 캡슐화
+  - Graceful degradation: `skip_unknown_drivers`, `skip_device_failures` → `BootstrapResult`에 실패 정보 보고
+  - 실패 시 롤백, `Deinit()` idempotent (소멸자에서 자동 호출)
+  - `DeviceManager::AddDevice()` 메서드 추가 (개별 디바이스 추가 지원)
+  - Pimpl 패턴, move-only, RAII
+  - 40 tests, `master_example` 리팩토링 (349→213줄)
 
 ### P1 — Examples
 
 - [x] 카테고리별 예제 정리 (2026-02-28)
-  - `examples/` 하위 core, log, config, hal, pci 폴더로 분류
+  - `examples/` 하위 core, log, config, hal, pci, master 폴더로 분류
   - 기존 doe_exchange.cpp → `examples/pci/`로 이동
-  - 모듈별 7개 예제 + 4개 fixture 파일 추가
+  - 모듈별 8개 예제 + 4개 fixture 파일 추가
+- [x] `master_example` Bootstrap 리팩토링 (2026-02-28)
+  - 기존 수동 드라이버 등록/config 파싱/lifecycle 코드를 Bootstrap::Init() 한 줄로 대체
+  - 349줄 → 213줄로 축소, I2C+PCI config+topology 데모 유지
 
 ### P2 — 드라이버 실제 구현
 
@@ -148,7 +172,10 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - `vendor/<sdk>/{include, linux/{x86_64,aarch64}, windows/x86_64}` 디렉토리 구조
   - `cmake/Find{Aardvark,FT4222H,PMU3,PMU4}.cmake` — vendor/ 우선 탐색 → *_ROOT → 시스템
   - `PLAS_WITH_<SDK>` 옵션 + `PLAS_HAS_<SDK>` 컴파일 정의, 모든 드라이버 항상 빌드 (SDK 조건부 링크)
-- [ ] FT4222H I2C 실제 구현 (libft4222 연동)
+- [x] FT4222H I2C 실제 구현 (2026-02-28)
+  - Dual-chip master+slave 아키텍처 (`ft4222h://master_idx:slave_idx`), FT4222H SDK + D2XX 의존
+  - Master (TX) I2CMaster_Write, Slave (RX) polling-based read, 설정 args (bitrate/slave_addr/sys_clock/rx_timeout_ms/rx_poll_interval_us)
+  - 33 unit tests + 7 integration tests (PLAS_TEST_FT4222H_PORT env-gated)
 - [ ] PMU3 PowerControl/SsdGpio 실제 구현
 - [ ] PMU4 PowerControl/SsdGpio 실제 구현
 - [ ] I3C/Serial/UART 드라이버 (대상 하드웨어 미정)

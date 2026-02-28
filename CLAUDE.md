@@ -24,6 +24,7 @@ cd build && ctest --output-on-failure
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
 - `plas::hal::pci` — PCI/CXL domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciTopology, Cxl, CxlMailbox)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
+- `plas::bootstrap` — application initialization helper (Bootstrap class)
 
 ## CMake Targets
 | Target | Dependencies | Private Deps |
@@ -33,6 +34,7 @@ cd build && ctest --output-on-failure
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
 | `plas_hal_interface` | `plas_core`, `plas_log`, `plas_config` | |
 | `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | Aardvark SDK, FT4222H SDK, PMU3 SDK, PMU4 SDK, libpci — all optional |
+| `plas_bootstrap` | `plas_hal_driver` | |
 
 ## Key Design Decisions
 - **Error handling**: `std::error_code` + `Result<T>` (no exceptions)
@@ -63,10 +65,14 @@ plas/
 │   │       ├── config/
 │   │       └── hal/
 │   │           └── interface/
-│   └── plas-drivers/           ← driver implementations
+│   ├── plas-drivers/           ← driver implementations
+│   │   ├── CMakeLists.txt
+│   │   ├── include/plas/hal/driver/
+│   │   └── src/hal/driver/
+│   └── plas-bootstrap/         ← application initialization helper
 │       ├── CMakeLists.txt
-│       ├── include/plas/hal/driver/
-│       └── src/hal/driver/
+│       ├── include/plas/bootstrap/
+│       └── src/bootstrap/
 ├── vendor/                    ← proprietary SDK headers + prebuilt libs
 │   ├── aardvark/
 │   │   ├── include/           ← aardvark.h
@@ -83,7 +89,8 @@ plas/
 │   ├── config/                ← Config load, ConfigNode tree, PropertyManager
 │   │   └── fixtures/          ← JSON/YAML fixture files
 │   ├── hal/                   ← DeviceManager, driver registration
-│   └── pci/                   ← DOE discovery & exchange, topology walk
+│   ├── pci/                   ← DOE discovery & exchange, topology walk
+│   └── master/                ← End-to-end Bootstrap demo
 ├── apps/
 └── packaging/
 ```
@@ -99,6 +106,28 @@ plas/
 | `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle |
 | `pci/` | `doe_exchange` | `plas::hal_interface` | PCI DOE discovery + data exchange (stub device) |
 | `pci/` | `topology_walk` | `plas::hal_interface` | sysfs PCI topology traversal (real hardware) |
+| `master/` | `master_example` | `plas::bootstrap` | End-to-end Bootstrap: config→devices→I2C+PCI I/O |
+
+## Bootstrap (`plas::bootstrap`)
+- **Class**: `Bootstrap` — single-call application initialization (replaces manual driver registration + config parsing + device lifecycle boilerplate)
+- **Header**: `components/plas-bootstrap/include/plas/bootstrap/bootstrap.h`
+- **Source**: `components/plas-bootstrap/src/bootstrap/bootstrap.cpp`
+- **Target**: `plas_bootstrap` (PUBLIC dep: `plas::hal_driver` — transitively includes hal_interface, config, log, core)
+- **Namespace**: `plas::bootstrap`
+- **Types**:
+  - `BootstrapConfig` — device_config_path, device_config_key_path, log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures
+  - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open")
+  - `BootstrapResult` — devices_opened, devices_failed, devices_skipped, failures vector
+- **API**:
+  - `static RegisterAllDrivers()` — registers all available drivers (hides `#ifdef PLAS_HAS_*` guards)
+  - `Init(BootstrapConfig) → Result<BootstrapResult>` — full init sequence: register drivers → logger → properties → config parse → device create/init/open
+  - `Deinit()` — reverse teardown (idempotent, also called by destructor)
+  - `GetDevice()`, `GetInterface<T>()`, `DeviceNames()`, `GetFailures()` — convenience accessors
+- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromFile → per-device DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **Graceful degradation**: `skip_unknown_drivers` skips unregistered drivers, `skip_device_failures` skips individual device failures — both report via `BootstrapResult::failures`
+- **Rollback**: Hard failure mid-init rolls back already-initialized subsystems in reverse order
+- **Pimpl**: Implementation hidden behind `struct Impl` (same pattern as Logger)
+- **Unit tests**: 40 tests in `tests/bootstrap/test_bootstrap.cpp`
 
 ## PCI Topology (sysfs-based)
 - **Class**: `PciTopology` — static utility class for PCI topology traversal and device management
@@ -202,4 +231,5 @@ plas/
    - Create `cmake/Find<Name>.cmake` (search `vendor/` → `*_ROOT` → system)
    - Add `vendor/<name>/{include, linux/x86_64, windows/x86_64}` directories
    - Add conditional block in `components/plas-drivers/CMakeLists.txt` (`PLAS_WITH_<NAME>` option + find + link + define)
-7. Add tests in `tests/hal/` (unit tests always built, integration tests gated by `PLAS_HAS_<NAME>`)
+7. Add `Register()` call to `Bootstrap::RegisterAllDrivers()` in `components/plas-bootstrap/src/bootstrap/bootstrap.cpp` (guarded by `#ifdef PLAS_HAS_<NAME>` if SDK-dependent)
+8. Add tests in `tests/hal/` (unit tests always built, integration tests gated by `PLAS_HAS_<NAME>`)

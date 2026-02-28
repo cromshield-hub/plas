@@ -59,6 +59,16 @@ core::Result<void> DeviceManager::LoadFromEntries(
     return core::Result<void>::Ok();
 }
 
+core::Result<void> DeviceManager::AddDevice(
+    const std::string& nickname, std::unique_ptr<Device> device) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (devices_.count(nickname) > 0) {
+        return core::Result<void>::Err(core::ErrorCode::kAlreadyOpen);
+    }
+    devices_[nickname] = std::move(device);
+    return core::Result<void>::Ok();
+}
+
 Device* DeviceManager::GetDevice(const std::string& nickname) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = devices_.find(nickname);

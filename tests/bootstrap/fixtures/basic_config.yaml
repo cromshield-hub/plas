@@ -1,0 +1,13 @@
+devices:
+  - nickname: aardvark0
+    driver: aardvark
+    uri: "aardvark://0:0x50"
+    args:
+      bitrate: "100000"
+      pullup: "true"
+
+  - nickname: aardvark1
+    driver: aardvark
+    uri: "aardvark://1:0x48"
+    args:
+      bitrate: "400000"

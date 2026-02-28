@@ -34,6 +34,9 @@ public:
     core::Result<void> LoadFromEntries(
         const std::vector<config::DeviceEntry>& entries);
 
+    core::Result<void> AddDevice(const std::string& nickname,
+                                  std::unique_ptr<Device> device);
+
     Device* GetDevice(const std::string& nickname);
 
     template <typename T>
