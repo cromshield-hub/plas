@@ -18,3 +18,27 @@ target_include_directories(plas_hal_driver
 target_link_libraries(plas_hal_driver
     PUBLIC plas::hal_interface plas::config plas::log
 )
+
+# ---------------------------------------------------------------------------
+# Optional pciutils (libpci) driver
+# ---------------------------------------------------------------------------
+option(PLAS_WITH_PCIUTILS "Build pciutils PCI driver (requires libpci)" ON)
+if(PLAS_WITH_PCIUTILS)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(PCIUTILS IMPORTED_TARGET libpci)
+    endif()
+endif()
+
+if(PCIUTILS_FOUND)
+    target_sources(plas_hal_driver PRIVATE
+        src/hal/driver/pciutils/pciutils_device.cpp
+    )
+    target_link_libraries(plas_hal_driver PRIVATE PkgConfig::PCIUTILS)
+    target_compile_definitions(plas_hal_driver PUBLIC PLAS_HAS_PCIUTILS=1)
+    set(PLAS_HAS_PCIUTILS TRUE PARENT_SCOPE)
+    message(STATUS "pciutils driver: enabled (libpci found)")
+else()
+    set(PLAS_HAS_PCIUTILS FALSE PARENT_SCOPE)
+    message(STATUS "pciutils driver: disabled (libpci not found)")
+endif()

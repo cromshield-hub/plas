@@ -71,3 +71,16 @@ add_executable(test_pci_doe hal/interface/pci/test_pci_doe.cpp)
 target_link_libraries(test_pci_doe
     PRIVATE plas::hal_interface GTest::gtest_main)
 gtest_discover_tests(test_pci_doe)
+
+# PciUtils driver tests (conditional on libpci availability)
+if(PLAS_HAS_PCIUTILS)
+    add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)
+    target_link_libraries(test_pciutils_device
+        PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+    gtest_discover_tests(test_pciutils_device)
+
+    add_executable(test_pciutils_integration hal/driver/test_pciutils_integration.cpp)
+    target_link_libraries(test_pciutils_integration
+        PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+    gtest_discover_tests(test_pciutils_integration)
+endif()
