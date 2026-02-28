@@ -5,10 +5,9 @@ C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C
 
 ## Build
 ```bash
-mkdir build && cd build
-cmake .. -DPLAS_BUILD_TESTS=ON
-cmake --build . -j$(nproc)
-ctest --output-on-failure
+cmake -B build -DPLAS_BUILD_TESTS=ON -DPLAS_BUILD_EXAMPLES=ON
+cmake --build build -j$(nproc)
+cd build && ctest --output-on-failure
 ```
 
 ## Coding Conventions
@@ -32,7 +31,7 @@ ctest --output-on-failure
 | `plas_core` | (none) | |
 | `plas_log` | `plas_core` | spdlog |
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
-| `plas_hal_interface` | `plas_core`, `plas_log` | |
+| `plas_hal_interface` | `plas_core`, `plas_log`, `plas_config` | |
 | `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | |
 
 ## Key Design Decisions
@@ -69,9 +68,26 @@ plas/
 ├── cmake/
 ├── tests/
 ├── examples/
+│   ├── core/                  ← Properties session CRUD
+│   ├── log/                   ← Logger init, macros, level control
+│   ├── config/                ← Config load, ConfigNode tree, PropertyManager
+│   │   └── fixtures/          ← JSON/YAML fixture files
+│   ├── hal/                   ← DeviceManager, driver registration
+│   └── pci/                   ← DOE discovery & exchange
 ├── apps/
 └── packaging/
 ```
+
+## Examples (`-DPLAS_BUILD_EXAMPLES=ON`)
+| Category | Example | Target | Description |
+|----------|---------|--------|-------------|
+| `core/` | `properties_basics` | `plas::core` | Session CRUD, typed Get/Set, GetAs conversion |
+| `log/` | `logger_basics` | `plas::log` | LogConfig, PLAS_LOG_* macros, runtime SetLevel |
+| `config/` | `config_load` | `plas::config` | Flat JSON, grouped YAML, LoadFromNode, FindDevice |
+| `config/` | `config_node_tree` | `plas::config` | Subtree navigation, type queries, chaining |
+| `config/` | `property_manager` | `plas::config` | Single/multi-session load, runtime update |
+| `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle |
+| `pci/` | `doe_exchange` | `plas::hal_interface` | PCI DOE discovery + data exchange (stub device) |
 
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
