@@ -170,6 +170,13 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - 기존 수동 드라이버 등록/config 파싱/lifecycle 코드를 Bootstrap::Init() 한 줄로 대체
   - 349줄 → 213줄로 축소, I2C+PCI config+topology 데모 유지
 
+### P1 — 문서화
+
+- [x] 사용자/AI 에이전트용 문서 작성 (2026-02-28)
+  - `docs/guide.md` — 사용 가이드 (빠른 시작, 설정, 디바이스 접근, 인터페이스, 에러 처리, 디버깅, 고급 사용법)
+  - `docs/api_reference.md` — API 레퍼런스 (모듈별 공개 API 시그니처 정리)
+  - 5가지 DX 기능 문서화: GetDeviceByUri, GetDevicesByInterface, DumpDevices, ValidateUri, DeviceFailure::detail
+
 ### P2 — 드라이버 실제 구현
 
 - [x] Aardvark I2C 실제 구현 (2026-02-28)
