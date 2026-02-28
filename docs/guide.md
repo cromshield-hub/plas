@@ -334,9 +334,10 @@ if (result.IsOk()) {
 ```cpp
 #include "plas/hal/device_manager.h"
 #include "plas/hal/interface/device_factory.h"
+#include "plas/hal/driver/aardvark/aardvark_device.h"
 
 // 1) 드라이버 등록
-AardvarkDevice::Register();
+plas::hal::driver::AardvarkDevice::Register();
 
 // 2) 설정 파일로 디바이스 로드
 auto& dm = plas::hal::DeviceManager::GetInstance();

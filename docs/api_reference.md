@@ -507,6 +507,15 @@ struct DoeProtocolId {
     uint8_t data_object_type;
 };
 
+namespace doe_vendor {
+constexpr uint16_t kPciSig = 0x0001;
+}
+
+namespace doe_type {
+constexpr uint8_t kDoeDiscovery = 0x00;
+constexpr uint8_t kCma = 0x01;
+}
+
 using DoePayload = std::vector<DWord>;
 
 enum class PciePortType : uint8_t {
