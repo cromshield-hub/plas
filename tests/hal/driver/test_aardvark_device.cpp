@@ -462,10 +462,10 @@ TEST_F(AardvarkSharedBusTest, ConcurrentOpenSamePort) {
     // registry (no crash, all succeed via shared bus state).
     const int kThreads = 8;
     std::vector<std::unique_ptr<AardvarkDevice>> devices;
-    devices.reserve(static_cast<size_t>(kThreads));
+    devices.reserve(kThreads);
     for (int i = 0; i < kThreads; ++i) {
         std::string nickname = "dev" + std::to_string(i);
-        // Decimal addresses 80-87 are valid 7-bit I2C addresses (<=127).
+        // Decimal addresses 80–87 are all valid 7-bit I2C addresses (≤127).
         std::string uri =
             "aardvark://0:" + std::to_string(static_cast<int>(0x50) + i);
         devices.push_back(
@@ -475,7 +475,7 @@ TEST_F(AardvarkSharedBusTest, ConcurrentOpenSamePort) {
 
     std::vector<std::thread> threads;
     std::atomic<int> success_count{0};
-    threads.reserve(static_cast<size_t>(kThreads));
+    threads.reserve(kThreads);
     for (int i = 0; i < kThreads; ++i) {
         threads.emplace_back([&devices, &success_count, i]() {
             if (devices[static_cast<size_t>(i)]->Open().IsOk()) {
