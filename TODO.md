@@ -25,7 +25,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | `plas_core` (types, error, result, units, byte_buffer, version, properties) | **Done** | Properties: 세션 기반 key-value 스토어, SafeNumericCast |
 | `plas_log` (logger, spdlog backend, pimpl) | **Done** | 싱글톤, PLAS_LOG_* 매크로 |
 | `plas_config` (JSON/YAML auto-detect, PropertyManager) | **Done** | 확장자 기반 포맷 감지, config→Properties 세션 매핑 |
-| `plas_hal_interface` (Device, DeviceFactory) | **Done** | ABC + 팩토리 패턴 |
+| `plas_hal_interface` (Device, DeviceFactory, DeviceManager) | **Done** | ABC + 팩토리 패턴 + config→인스턴스 레지스트리 |
 | CMake / FetchContent / install | **Done** | PlasInstall.cmake 포함 |
 | Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버) |
 
@@ -62,14 +62,22 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | Config (JSON, YAML) | 10 | **Pass** |
 | Config (PropertyManager) | 31 | **Pass** |
 | HAL (device_factory) | 7 | **Pass** |
+| HAL (device_manager) | 20 | **Pass** |
 | PCI (types, config, doe) | 35 | **Pass** |
-| **합계** | **156** | **All Pass** |
+| **합계** | **176** | **All Pass** |
 
 ---
 
 ## Backlog
 
 > 우선순위: P0 (즉시) > P1 (다음) > P2 (추후) > P3 (아이디어)
+
+### P1 — 런타임 레지스트리
+
+- [x] `DeviceManager` — Config→Device 인스턴스 레지스트리 (2026-02-28)
+  - Meyer's singleton, LoadFromConfig/LoadFromEntries, nickname 기반 GetDevice/GetInterface<T>
+  - `plas_hal_interface`에 배치, `plas::config` PUBLIC 의존 추가
+  - 20개 테스트 (싱글턴, 로드, 조회, 인터페이스 캐스팅, 에러, Reset, lifecycle)
 
 ### P1 — PCI/CXL 확장
 
@@ -123,3 +131,12 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 ```markdown
 - [x] 요구사항 제목 (2026-02-28)
 ```
+
+### 사용 시나리오 ###
+최종 build는: Testcase (app) -> libnvme (inhouse library, nvme 제어용) -> plas
+실행시 ./app config.json
+config.json에는 아래 정보가 있지
+ - nvme의 bus 정보 (여러개 연결 가능)
+ - hw 정보와 uri 등 (각자 여러개 달릴 수 있지)
+
+프로그래이 실행되면 config.json의 내용을 바탕으로 어디선가 nvme와 hw, 사용 가능한 인터페이스 등의 정보를 가지고 있고, libnvme나 testcase가 접근할 수 있어야하고, 거기서 정보를 바탕으로 interface를 열어서 사용하는거지.
