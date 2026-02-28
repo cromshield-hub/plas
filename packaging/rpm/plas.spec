@@ -14,8 +14,8 @@ BuildRequires:  gcc-c++ >= 7
 BuildRequires:  make
 
 %description
-PLAS (Platform Library Across Systems) provides a unified C++17 interface
-for hardware backends including I2C adapters, power management units,
+PLAS (Platform Library Across Systems) provides a unified C++17 HAL
+(Hardware Abstraction Layer) for I2C adapters, power management units,
 and SSD GPIO control.
 
 # Meta package - installs everything
@@ -30,8 +30,8 @@ Summary:        PLAS core libraries
 Provides:       libplas_core.so
 Provides:       libplas_log.so
 Provides:       libplas_config.so
-Provides:       libplas_backend_interface.so
-Provides:       libplas_backend_driver.so
+Provides:       libplas_hal_interface.so
+Provides:       libplas_hal_driver.so
 
 %description core
 Core PLAS libraries including logging, configuration parsing,
@@ -76,8 +76,8 @@ against the PLAS libraries.
 %{_libdir}/libplas_core.so*
 %{_libdir}/libplas_log.so*
 %{_libdir}/libplas_config.so*
-%{_libdir}/libplas_backend_interface.so*
-%{_libdir}/libplas_backend_driver.so*
+%{_libdir}/libplas_hal_interface.so*
+%{_libdir}/libplas_hal_driver.so*
 %{_datadir}/plas/VERSION
 
 %files devel

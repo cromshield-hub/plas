@@ -1,7 +1,7 @@
 # PLAS — Platform Library Across Systems
 
 ## Project Overview
-C++17 library providing unified interfaces for hardware backends (I2C, I3C, Serial, UART, Power Control, SSD GPIO) with driver implementations for Aardvark, FT4222H, PMU3, and PMU4 devices.
+C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO) with driver implementations for Aardvark, FT4222H, PMU3, and PMU4 devices.
 
 ## Build
 ```bash
@@ -22,9 +22,9 @@ ctest --output-on-failure
 - `plas::core` — types, error codes, units, byte buffer
 - `plas::log` — logger (spdlog backend, compile-time selection)
 - `plas::config` — JSON/YAML config parsing
-- `plas::backend` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
-- `plas::backend::pci` — PCI domain types and interfaces (Bdf, PciConfig, PciDoe)
-- `plas::backend::driver` — driver implementations (AardvarkDevice, Pmu3Device, etc.)
+- `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
+- `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciConfig, PciDoe)
+- `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, etc.)
 
 ## CMake Targets
 | Target | Dependencies | Private Deps |
@@ -32,8 +32,8 @@ ctest --output-on-failure
 | `plas_core` | (none) | |
 | `plas_log` | `plas_core` | spdlog |
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
-| `plas_backend_interface` | `plas_core`, `plas_log` | |
-| `plas_backend_driver` | `plas_backend_interface`, `plas_config`, `plas_log` | |
+| `plas_hal_interface` | `plas_core`, `plas_log` | |
+| `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | |
 
 ## Key Design Decisions
 - **Error handling**: `std::error_code` + `Result<T>` (no exceptions)
@@ -47,23 +47,25 @@ ctest --output-on-failure
 ```
 plas/
 ├── components/
-│   └── plas-core/              ← all 5 library targets
+│   ├── plas-core/              ← core library targets
+│   │   ├── CMakeLists.txt
+│   │   ├── include/plas/       ← public headers
+│   │   │   ├── core/
+│   │   │   ├── log/
+│   │   │   ├── config/
+│   │   │   └── hal/
+│   │   │       └── interface/
+│   │   │           └── pci/
+│   │   └── src/
+│   │       ├── core/
+│   │       ├── log/
+│   │       ├── config/
+│   │       └── hal/
+│   │           └── interface/
+│   └── plas-drivers/           ← driver implementations
 │       ├── CMakeLists.txt
-│       ├── include/plas/       ← public headers
-│       │   ├── core/
-│       │   ├── log/
-│       │   ├── config/
-│       │   └── backend/
-│       │       ├── interface/
-│       │       │   └── pci/
-│       │       └── driver/
-│       └── src/
-│           ├── core/
-│           ├── log/
-│           ├── config/
-│           └── backend/
-│               ├── interface/
-│               └── driver/
+│       ├── include/plas/hal/driver/
+│       └── src/hal/driver/
 ├── cmake/
 ├── tests/
 ├── examples/
@@ -72,9 +74,9 @@ plas/
 ```
 
 ## Adding a New Driver
-1. Create header in `components/plas-core/include/plas/backend/driver/<name>/<name>_device.h`
+1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
 2. Inherit from `Device` + relevant interface ABCs
-3. Implement stub in `components/plas-core/src/backend/driver/<name>/<name>_device.cpp`
+3. Implement stub in `components/plas-drivers/src/hal/driver/<name>/<name>_device.cpp`
 4. Add static `Register()` method that calls `DeviceFactory::RegisterDriver()`
-5. Add source to `components/plas-core/CMakeLists.txt` (plas_backend_driver target)
-6. Add tests in `tests/backend/`
+5. Add source to `components/plas-drivers/CMakeLists.txt` (plas_hal_driver target)
+6. Add tests in `tests/hal/`

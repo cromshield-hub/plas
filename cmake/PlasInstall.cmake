@@ -9,13 +9,18 @@ install(DIRECTORY components/plas-core/include/plas
     FILES_MATCHING PATTERN "*.h"
 )
 
+install(DIRECTORY components/plas-drivers/include/plas
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
 # Install plas library targets
 install(TARGETS
         plas_core
         plas_log
         plas_config
-        plas_backend_interface
-        plas_backend_driver
+        plas_hal_interface
+        plas_hal_driver
         plas_compiler_settings
     EXPORT PlasTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

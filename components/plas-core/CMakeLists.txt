@@ -1,5 +1,5 @@
-# plas-core component — all library targets
-# Targets: plas::core, plas::log, plas::config, plas::backend_interface, plas::backend_driver
+# plas-core component — core library targets
+# Targets: plas::core, plas::log, plas::config, plas::hal_interface
 
 # ---------- plas_core ----------
 add_library(plas_core
@@ -65,37 +65,18 @@ target_link_libraries(plas_config
     PRIVATE nlohmann_json::nlohmann_json yaml-cpp::yaml-cpp
 )
 
-# ---------- plas_backend_interface ----------
-add_library(plas_backend_interface
-    src/backend/interface/device_factory.cpp
+# ---------- plas_hal_interface ----------
+add_library(plas_hal_interface
+    src/hal/interface/device_factory.cpp
 )
-add_library(plas::backend_interface ALIAS plas_backend_interface)
+add_library(plas::hal_interface ALIAS plas_hal_interface)
 
-target_include_directories(plas_backend_interface
+target_include_directories(plas_hal_interface
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(plas_backend_interface
+target_link_libraries(plas_hal_interface
     PUBLIC plas::core plas::log
-)
-
-# ---------- plas_backend_driver ----------
-add_library(plas_backend_driver
-    src/backend/driver/aardvark/aardvark_device.cpp
-    src/backend/driver/ft4222h/ft4222h_device.cpp
-    src/backend/driver/pmu3/pmu3_device.cpp
-    src/backend/driver/pmu4/pmu4_device.cpp
-)
-add_library(plas::backend_driver ALIAS plas_backend_driver)
-
-target_include_directories(plas_backend_driver
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
-
-target_link_libraries(plas_backend_driver
-    PUBLIC plas::backend_interface plas::config plas::log
 )

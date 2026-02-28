@@ -16,9 +16,9 @@
 #include <string>
 #include <vector>
 
-#include "plas/backend/interface/device.h"
-#include "plas/backend/interface/pci/pci_config.h"
-#include "plas/backend/interface/pci/pci_doe.h"
+#include "plas/hal/interface/device.h"
+#include "plas/hal/interface/pci/pci_config.h"
+#include "plas/hal/interface/pci/pci_doe.h"
 #include "plas/core/error.h"
 #include "plas/core/result.h"
 #include "plas/core/types.h"
@@ -26,9 +26,9 @@
 // ---------------------------------------------------------------------------
 // Stub device — replace with a real PCI driver implementation
 // ---------------------------------------------------------------------------
-class StubPciDevice : public plas::backend::Device,
-                      public plas::backend::pci::PciConfig,
-                      public plas::backend::pci::PciDoe {
+class StubPciDevice : public plas::hal::Device,
+                      public plas::hal::pci::PciConfig,
+                      public plas::hal::pci::PciDoe {
 public:
     // Device
     plas::core::Result<void> Init() override {
@@ -43,52 +43,52 @@ public:
     plas::core::Result<void> Reset() override {
         return plas::core::Result<void>::Ok();
     }
-    plas::backend::DeviceState GetState() const override {
-        return plas::backend::DeviceState::kOpen;
+    plas::hal::DeviceState GetState() const override {
+        return plas::hal::DeviceState::kOpen;
     }
     std::string GetName() const override { return "stub_pci"; }
     std::string GetUri() const override { return "stub://0:0"; }
 
     // PciConfig — stub reads/writes
     plas::core::Result<plas::core::Byte> ReadConfig8(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset) override {
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset) override {
         return plas::core::Result<plas::core::Byte>::Ok(0);
     }
     plas::core::Result<plas::core::Word> ReadConfig16(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset) override {
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset) override {
         return plas::core::Result<plas::core::Word>::Ok(0);
     }
     plas::core::Result<plas::core::DWord> ReadConfig32(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset) override {
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset) override {
         return plas::core::Result<plas::core::DWord>::Ok(0);
     }
     plas::core::Result<void> WriteConfig8(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset,
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset,
         plas::core::Byte) override {
         return plas::core::Result<void>::Ok();
     }
     plas::core::Result<void> WriteConfig16(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset,
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset,
         plas::core::Word) override {
         return plas::core::Result<void>::Ok();
     }
     plas::core::Result<void> WriteConfig32(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset,
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset,
         plas::core::DWord) override {
         return plas::core::Result<void>::Ok();
     }
 
-    plas::core::Result<std::optional<plas::backend::pci::ConfigOffset>>
-    FindCapability(plas::backend::pci::Bdf,
-                   plas::backend::pci::CapabilityId) override {
+    plas::core::Result<std::optional<plas::hal::pci::ConfigOffset>>
+    FindCapability(plas::hal::pci::Bdf,
+                   plas::hal::pci::CapabilityId) override {
         return plas::core::Result<
-            std::optional<plas::backend::pci::ConfigOffset>>::Ok(std::nullopt);
+            std::optional<plas::hal::pci::ConfigOffset>>::Ok(std::nullopt);
     }
 
-    plas::core::Result<std::optional<plas::backend::pci::ConfigOffset>>
-    FindExtCapability(plas::backend::pci::Bdf,
-                      plas::backend::pci::ExtCapabilityId id) override {
-        using namespace plas::backend::pci;
+    plas::core::Result<std::optional<plas::hal::pci::ConfigOffset>>
+    FindExtCapability(plas::hal::pci::Bdf,
+                      plas::hal::pci::ExtCapabilityId id) override {
+        using namespace plas::hal::pci;
         if (id == ExtCapabilityId::kDoe) {
             return plas::core::Result<std::optional<ConfigOffset>>::Ok(
                 std::optional<ConfigOffset>(0x150));
@@ -98,21 +98,21 @@ public:
     }
 
     // PciDoe — stub discover/exchange
-    plas::core::Result<std::vector<plas::backend::pci::DoeProtocolId>>
-    DoeDiscover(plas::backend::pci::Bdf,
-                plas::backend::pci::ConfigOffset) override {
-        using namespace plas::backend::pci;
+    plas::core::Result<std::vector<plas::hal::pci::DoeProtocolId>>
+    DoeDiscover(plas::hal::pci::Bdf,
+                plas::hal::pci::ConfigOffset) override {
+        using namespace plas::hal::pci;
         return plas::core::Result<std::vector<DoeProtocolId>>::Ok(
             {{doe_vendor::kPciSig, doe_type::kDoeDiscovery},
              {doe_vendor::kPciSig, doe_type::kCma}});
     }
 
-    plas::core::Result<plas::backend::pci::DoePayload> DoeExchange(
-        plas::backend::pci::Bdf, plas::backend::pci::ConfigOffset,
-        plas::backend::pci::DoeProtocolId,
-        const plas::backend::pci::DoePayload&) override {
+    plas::core::Result<plas::hal::pci::DoePayload> DoeExchange(
+        plas::hal::pci::Bdf, plas::hal::pci::ConfigOffset,
+        plas::hal::pci::DoeProtocolId,
+        const plas::hal::pci::DoePayload&) override {
         // Echo back a dummy response
-        return plas::core::Result<plas::backend::pci::DoePayload>::Ok(
+        return plas::core::Result<plas::hal::pci::DoePayload>::Ok(
             {0xDEADBEEF, 0xCAFEBABE});
     }
 };
@@ -120,7 +120,7 @@ public:
 // ---------------------------------------------------------------------------
 // Helper: parse "bus:device.function" string into Bdf
 // ---------------------------------------------------------------------------
-static std::optional<plas::backend::pci::Bdf> ParseBdf(const char* str) {
+static std::optional<plas::hal::pci::Bdf> ParseBdf(const char* str) {
     unsigned bus = 0, dev = 0, func = 0;
     if (std::sscanf(str, "%x:%x.%x", &bus, &dev, &func) != 3) {
         return std::nullopt;
@@ -128,7 +128,7 @@ static std::optional<plas::backend::pci::Bdf> ParseBdf(const char* str) {
     if (bus > 0xFF || dev > 0x1F || func > 0x07) {
         return std::nullopt;
     }
-    return plas::backend::pci::Bdf{static_cast<uint8_t>(bus),
+    return plas::hal::pci::Bdf{static_cast<uint8_t>(bus),
                                     static_cast<uint8_t>(dev),
                                     static_cast<uint8_t>(func)};
 }
@@ -137,7 +137,7 @@ static std::optional<plas::backend::pci::Bdf> ParseBdf(const char* str) {
 // Main
 // ---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
-    using namespace plas::backend::pci;
+    using namespace plas::hal::pci;
 
     // --- Parse BDF from command line ---
     if (argc < 2) {
