@@ -52,6 +52,18 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | Pmu3Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
 | Pmu4Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
 
+### Examples
+
+| 카테고리 | 예제 | 비고 |
+|----------|------|------|
+| `examples/core/` | `properties_basics` | 세션 CRUD, 타입 변환, 세션 격리 |
+| `examples/log/` | `logger_basics` | LogConfig 초기화, 매크로, 런타임 레벨 변경 |
+| `examples/config/` | `config_load` | flat JSON, grouped YAML, LoadFromNode, FindDevice |
+| `examples/config/` | `config_node_tree` | 서브트리 탐색, 타입 쿼리, 체이닝 |
+| `examples/config/` | `property_manager` | single/multi-session 로드, 런타임 업데이트 |
+| `examples/hal/` | `device_manager` | 드라이버 등록, 인터페이스 캐스팅, lifecycle |
+| `examples/pci/` | `doe_exchange` | PCI DOE discovery + data exchange (stub) |
+
 ### Tests
 
 | 카테고리 | 테스트 수 | 상태 |
@@ -98,6 +110,13 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - PciDoe를 composition으로 사용, DVSEC 기반 식별
 - [ ] `interface/pci/mctp.h` — MCTP over PCIe VDM 인터페이스 ABC
 - [ ] PCI 드라이버 구현체 (대상 하드웨어 미정)
+
+### P1 — Examples
+
+- [x] 카테고리별 예제 정리 (2026-02-28)
+  - `examples/` 하위 core, log, config, hal, pci 폴더로 분류
+  - 기존 doe_exchange.cpp → `examples/pci/`로 이동
+  - 모듈별 7개 예제 + 4개 fixture 파일 추가
 
 ### P2 — 드라이버 실제 구현
 
