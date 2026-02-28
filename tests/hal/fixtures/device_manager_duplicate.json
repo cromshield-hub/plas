@@ -1,0 +1,16 @@
+{
+    "devices": [
+        {
+            "nickname": "dup_device",
+            "uri": "aardvark://0:0x50",
+            "driver": "aardvark",
+            "args": {}
+        },
+        {
+            "nickname": "dup_device",
+            "uri": "aardvark://1:0x51",
+            "driver": "aardvark",
+            "args": {}
+        }
+    ]
+}

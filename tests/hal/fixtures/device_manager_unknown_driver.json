@@ -1,0 +1,10 @@
+{
+    "devices": [
+        {
+            "nickname": "unknown0",
+            "uri": "unknown://0",
+            "driver": "nonexistent_driver",
+            "args": {}
+        }
+    ]
+}

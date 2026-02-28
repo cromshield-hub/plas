@@ -72,6 +72,7 @@ target_link_libraries(plas_config
 # ---------- plas_hal_interface ----------
 add_library(plas_hal_interface
     src/hal/interface/device_factory.cpp
+    src/hal/device_manager.cpp
 )
 add_library(plas::hal_interface ALIAS plas_hal_interface)
 
@@ -82,5 +83,5 @@ target_include_directories(plas_hal_interface
 )
 
 target_link_libraries(plas_hal_interface
-    PUBLIC plas::core plas::log
+    PUBLIC plas::core plas::log plas::config
 )

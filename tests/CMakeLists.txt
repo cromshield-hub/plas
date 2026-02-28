@@ -38,8 +38,15 @@ gtest_discover_tests(test_property_manager)
 # Copy test fixtures to build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/config/fixtures/
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/hal/fixtures/
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
 
 # HAL tests
+add_executable(test_device_manager hal/test_device_manager.cpp)
+target_link_libraries(test_device_manager
+    PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+gtest_discover_tests(test_device_manager)
+
 add_executable(test_device_factory hal/interface/test_device_factory.cpp)
 target_link_libraries(test_device_factory
     PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)

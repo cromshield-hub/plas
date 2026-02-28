@@ -1,0 +1,11 @@
+devices:
+  - nickname: aardvark0
+    uri: "aardvark://0:0x50"
+    driver: aardvark
+    args:
+      bitrate: "400000"
+  - nickname: pmu3_main
+    uri: "pmu3://usb:PMU3-001"
+    driver: pmu3
+    args:
+      channel: "0"
