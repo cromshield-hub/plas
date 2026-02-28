@@ -296,6 +296,26 @@ TEST(Ft4222hDeviceTest, GetBitrateDefault) {
 // Reset
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// stop=false parameter (stub mode — no SDK, verifies no crash + correct error)
+// ---------------------------------------------------------------------------
+
+TEST(Ft4222hDeviceTest, WriteWithStopFalseNotCrash) {
+    auto entry = MakeEntry("dev0", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    uint8_t buf[1] = {0};
+    auto result = device.Write(0x40, buf, 1, /*stop=*/false);
+    EXPECT_EQ(result.Error(), core::ErrorCode::kNotInitialized);
+}
+
+TEST(Ft4222hDeviceTest, ReadWithStopFalseNotCrash) {
+    auto entry = MakeEntry("dev0", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    uint8_t buf[1] = {0};
+    auto result = device.Read(0x40, buf, 1, /*stop=*/false);
+    EXPECT_EQ(result.Error(), core::ErrorCode::kNotInitialized);
+}
+
 TEST(Ft4222hDeviceTest, ResetFromUninitialized) {
     auto entry = MakeEntry("dev0", "ft4222h://0:1");
     Ft4222hDevice device(entry);

@@ -26,9 +26,9 @@ public:
 
     // I2c interface
     core::Result<size_t> Read(core::Address addr, core::Byte* data,
-                              size_t length) override;
+                              size_t length, bool stop = true) override;
     core::Result<size_t> Write(core::Address addr, const core::Byte* data,
-                               size_t length) override;
+                               size_t length, bool stop = true) override;
     core::Result<size_t> WriteRead(core::Address addr,
                                    const core::Byte* write_data,
                                    size_t write_len, core::Byte* read_data,

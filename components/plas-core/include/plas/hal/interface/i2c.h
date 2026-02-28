@@ -13,10 +13,10 @@ public:
     virtual ~I2c() = default;
 
     virtual core::Result<size_t> Read(core::Address addr, core::Byte* data,
-                                      size_t length) = 0;
+                                      size_t length, bool stop = true) = 0;
     virtual core::Result<size_t> Write(core::Address addr,
-                                       const core::Byte* data,
-                                       size_t length) = 0;
+                                       const core::Byte* data, size_t length,
+                                       bool stop = true) = 0;
     virtual core::Result<size_t> WriteRead(core::Address addr,
                                            const core::Byte* write_data,
                                            size_t write_len,

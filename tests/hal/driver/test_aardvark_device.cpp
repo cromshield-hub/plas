@@ -305,6 +305,26 @@ TEST(AardvarkDeviceTest, InitFailsWithPortOverflow) {
 // Reset
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// stop=false parameter (stub mode — no SDK, verifies no crash + correct error)
+// ---------------------------------------------------------------------------
+
+TEST(AardvarkDeviceTest, WriteWithStopFalseNotCrash) {
+    auto entry = MakeEntry("dev0", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    uint8_t buf[1] = {0};
+    auto result = device.Write(0x50, buf, 1, /*stop=*/false);
+    EXPECT_EQ(result.Error(), core::ErrorCode::kNotInitialized);
+}
+
+TEST(AardvarkDeviceTest, ReadWithStopFalseNotCrash) {
+    auto entry = MakeEntry("dev0", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    uint8_t buf[1] = {0};
+    auto result = device.Read(0x50, buf, 1, /*stop=*/false);
+    EXPECT_EQ(result.Error(), core::ErrorCode::kNotInitialized);
+}
+
 TEST(AardvarkDeviceTest, ResetFromUninitialized) {
     auto entry = MakeEntry("dev0", "aardvark://0:0x50");
     AardvarkDevice device(entry);

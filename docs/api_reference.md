@@ -393,8 +393,11 @@ class DeviceManager {
 
 ```cpp
 class I2c {
-    virtual Result<size_t> Read(Address addr, Byte* data, size_t length) = 0;
-    virtual Result<size_t> Write(Address addr, const Byte* data, size_t length) = 0;
+    // stop=false: STOP을 생성하지 않아 Repeated START로 이어지는 전송을 구성할 수 있음
+    virtual Result<size_t> Read(Address addr, Byte* data, size_t length,
+                                bool stop = true) = 0;
+    virtual Result<size_t> Write(Address addr, const Byte* data, size_t length,
+                                 bool stop = true) = 0;
     virtual Result<size_t> WriteRead(Address addr,
                                       const Byte* write_data, size_t write_len,
                                       Byte* read_data, size_t read_len) = 0;
@@ -407,9 +410,23 @@ class I2c {
 
 ```cpp
 class I3c {
-    virtual Result<size_t> Read(Address addr, Byte* data, size_t length) = 0;
-    virtual Result<size_t> Write(Address addr, const Byte* data, size_t length) = 0;
-    virtual Result<void> SendCcc(uint8_t ccc_id, const Byte* data, size_t length) = 0;
+    virtual Result<size_t> Read(Address addr, Byte* data, size_t length,
+                                bool stop = true) = 0;
+    virtual Result<size_t> Write(Address addr, const Byte* data, size_t length,
+                                 bool stop = true) = 0;
+
+    // Broadcast CCC: 버스 전체 전송, 응답 없음
+    virtual Result<void> SendBroadcastCcc(uint8_t ccc_id,
+                                          const Byte* data, size_t length) = 0;
+
+    // Direct CCC SET: 특정 디바이스에 명령 전송, 응답 없음
+    virtual Result<void> SendDirectCcc(uint8_t ccc_id, Address addr,
+                                       const Byte* data, size_t length) = 0;
+
+    // Direct CCC GET: 특정 디바이스로부터 데이터 수신
+    virtual Result<size_t> RecvDirectCcc(uint8_t ccc_id, Address addr,
+                                         Byte* data, size_t length) = 0;
+
     virtual Result<void> SetFrequency(Frequency freq) = 0;
 };
 ```

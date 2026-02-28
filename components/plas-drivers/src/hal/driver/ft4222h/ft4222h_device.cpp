@@ -351,7 +351,7 @@ std::string Ft4222hDevice::GetUri() const {
 
 core::Result<size_t> Ft4222hDevice::Write(core::Address addr,
                                           const core::Byte* data,
-                                          size_t length) {
+                                          size_t length, bool stop) {
     if (state_ != DeviceState::kOpen) {
         return core::Result<size_t>::Err(core::ErrorCode::kNotInitialized);
     }
@@ -365,9 +365,12 @@ core::Result<size_t> Ft4222hDevice::Write(core::Address addr,
 #ifdef PLAS_HAS_FT4222H
     std::lock_guard<std::mutex> lock(i2c_mutex_);
     uint16 transferred = 0;
-    FT4222_STATUS status = FT4222_I2CMaster_Write(
+    // START_AND_STOP (0x06) = normal transfer; START (0x02) = no STOP (Repeated START possible)
+    uint8 flag = stop ? START_AND_STOP : START;
+    FT4222_STATUS status = FT4222_I2CMaster_WriteEx(
         static_cast<FT_HANDLE>(master_handle_),
         static_cast<uint16>(addr),
+        flag,
         const_cast<uint8*>(data),
         static_cast<uint16>(length),
         &transferred);
@@ -379,12 +382,13 @@ core::Result<size_t> Ft4222hDevice::Write(core::Address addr,
     (void)addr;
     (void)data;
     (void)length;
+    (void)stop;
     return core::Result<size_t>::Err(core::ErrorCode::kNotSupported);
 #endif
 }
 
 core::Result<size_t> Ft4222hDevice::Read(core::Address addr, core::Byte* data,
-                                         size_t length) {
+                                         size_t length, bool stop) {
     if (state_ != DeviceState::kOpen) {
         return core::Result<size_t>::Err(core::ErrorCode::kNotInitialized);
     }
@@ -394,6 +398,9 @@ core::Result<size_t> Ft4222hDevice::Read(core::Address addr, core::Byte* data,
     if (length > 0xFFFF) {
         return core::Result<size_t>::Err(core::ErrorCode::kInvalidArgument);
     }
+    // Slave-mode receive: addr and stop are DUT-controlled, not used by host.
+    (void)addr;
+    (void)stop;
 
 #ifdef PLAS_HAS_FT4222H
     std::lock_guard<std::mutex> lock(i2c_mutex_);
@@ -415,7 +422,6 @@ core::Result<size_t> Ft4222hDevice::Read(core::Address addr, core::Byte* data,
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(transferred));
 #else
-    (void)addr;
     (void)data;
     (void)length;
     return core::Result<size_t>::Err(core::ErrorCode::kNotSupported);
@@ -441,11 +447,12 @@ core::Result<size_t> Ft4222hDevice::WriteRead(core::Address addr,
 #ifdef PLAS_HAS_FT4222H
     std::lock_guard<std::mutex> lock(i2c_mutex_);
 
-    // Master write
+    // Master write without STOP — Repeated START follows for the slave read.
     uint16 write_transferred = 0;
-    FT4222_STATUS status = FT4222_I2CMaster_Write(
+    FT4222_STATUS status = FT4222_I2CMaster_WriteEx(
         static_cast<FT_HANDLE>(master_handle_),
         static_cast<uint16>(addr),
+        START,
         const_cast<uint8*>(write_data),
         static_cast<uint16>(write_len),
         &write_transferred);

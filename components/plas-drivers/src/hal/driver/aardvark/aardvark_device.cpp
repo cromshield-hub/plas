@@ -240,7 +240,8 @@ std::string AardvarkDevice::GetUri() const {
 // ---------------------------------------------------------------------------
 
 core::Result<size_t> AardvarkDevice::Read(core::Address addr,
-                                          core::Byte* data, size_t length) {
+                                          core::Byte* data, size_t length,
+                                          bool stop) {
     if (state_ != DeviceState::kOpen) {
         return core::Result<size_t>::Err(core::ErrorCode::kNotInitialized);
     }
@@ -253,8 +254,9 @@ core::Result<size_t> AardvarkDevice::Read(core::Address addr,
 
 #ifdef PLAS_HAS_AARDVARK
     std::lock_guard<std::mutex> lock(i2c_mutex_);
+    auto flags = static_cast<uint16_t>(stop ? AA_I2C_NO_FLAGS : AA_I2C_NO_STOP);
     int result = aa_i2c_read(handle_, static_cast<uint16_t>(addr),
-                             AA_I2C_NO_FLAGS, static_cast<uint16_t>(length),
+                             flags, static_cast<uint16_t>(length),
                              data);
     if (result < 0) {
         return core::Result<size_t>::Err(MapAardvarkError(result));
@@ -264,13 +266,14 @@ core::Result<size_t> AardvarkDevice::Read(core::Address addr,
     (void)addr;
     (void)data;
     (void)length;
+    (void)stop;
     return core::Result<size_t>::Err(core::ErrorCode::kNotSupported);
 #endif
 }
 
 core::Result<size_t> AardvarkDevice::Write(core::Address addr,
                                            const core::Byte* data,
-                                           size_t length) {
+                                           size_t length, bool stop) {
     if (state_ != DeviceState::kOpen) {
         return core::Result<size_t>::Err(core::ErrorCode::kNotInitialized);
     }
@@ -283,8 +286,9 @@ core::Result<size_t> AardvarkDevice::Write(core::Address addr,
 
 #ifdef PLAS_HAS_AARDVARK
     std::lock_guard<std::mutex> lock(i2c_mutex_);
+    auto flags = static_cast<uint16_t>(stop ? AA_I2C_NO_FLAGS : AA_I2C_NO_STOP);
     int result = aa_i2c_write(handle_, static_cast<uint16_t>(addr),
-                              AA_I2C_NO_FLAGS, static_cast<uint16_t>(length),
+                              flags, static_cast<uint16_t>(length),
                               data);
     if (result < 0) {
         return core::Result<size_t>::Err(MapAardvarkError(result));
@@ -294,6 +298,7 @@ core::Result<size_t> AardvarkDevice::Write(core::Address addr,
     (void)addr;
     (void)data;
     (void)length;
+    (void)stop;
     return core::Result<size_t>::Err(core::ErrorCode::kNotSupported);
 #endif
 }

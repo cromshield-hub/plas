@@ -190,8 +190,8 @@ PLAS가 제공하는 순수 가상 인터페이스(ABC) 목록입니다. 드라�
 
 | 인터페이스 | 네임스페이스 | 주요 메서드 | 용도 |
 |------------|-------------|------------|------|
-| `I2c` | `plas::hal` | Read, Write, WriteRead, SetBitrate | I2C 버스 통신 |
-| `I3c` | `plas::hal` | Read, Write, SendCcc, SetFrequency | I3C 버스 통신 |
+| `I2c` | `plas::hal` | Read(stop), Write(stop), WriteRead, SetBitrate | I2C 버스 통신 |
+| `I3c` | `plas::hal` | Read(stop), Write(stop), SendBroadcastCcc, SendDirectCcc, RecvDirectCcc, SetFrequency | I3C 버스 통신 |
 | `Serial` | `plas::hal` | Read, Write, SetBaudRate, Flush | 시리얼 포트 |
 | `Uart` | `plas::hal` | Read, Write, SetBaudRate, SetParity | UART 통신 |
 | `PowerControl` | `plas::hal` | SetVoltage, GetVoltage, PowerOn/Off | 전원 제어 |
