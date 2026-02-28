@@ -1,0 +1,18 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: Aardvark Driver Args
+description: Configuration arguments for the Aardvark I2C driver
+type: object
+properties:
+  bitrate:
+    type: integer
+    minimum: 1
+    description: I2C bitrate in Hz (default 100000)
+  pullup:
+    type: boolean
+    description: Enable I2C pull-up resistors (default true)
+  bus_timeout_ms:
+    type: integer
+    minimum: 0
+    maximum: 65535
+    description: Bus timeout in milliseconds (default 200)
+additionalProperties: false

@@ -1,5 +1,6 @@
 #include "plas/bootstrap/bootstrap.h"
 
+#include <set>
 #include <sstream>
 #include <utility>
 
@@ -19,6 +20,8 @@
 #include "plas/hal/interface/pci/cxl.h"
 #include "plas/hal/interface/pci/cxl_mailbox.h"
 #include "plas/log/logger.h"
+#include "plas/configspec/spec_registry.h"
+#include "plas/configspec/validator.h"
 
 #include "plas/hal/driver/aardvark/aardvark_device.h"
 #include "plas/hal/driver/ft4222h/ft4222h_device.h"
@@ -213,8 +216,59 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
     BootstrapResult result;
     impl_->failures.clear();
 
+    // 4b. Config spec validation (opt-in via validation_mode)
+    std::set<std::string> validation_failed_nicknames;
+    if (cfg.validation_mode != configspec::ValidationMode::kLenient) {
+        auto& registry = configspec::SpecRegistry::GetInstance();
+        registry.RegisterBuiltinSpecs();
+
+        if (!cfg.spec_dir.empty()) {
+            registry.LoadSpecsFromDirectory(cfg.spec_dir);
+        }
+
+        configspec::Validator validator(cfg.validation_mode);
+
+        for (const auto& entry : entries) {
+            auto vr = validator.ValidateDeviceEntry(entry);
+            if (vr.IsError()) continue;  // no spec → skip
+            if (vr.Value().valid) continue;
+
+            auto ec = core::make_error_code(core::ErrorCode::kInvalidArgument);
+            std::string detail =
+                "config spec validation failed: " + vr.Value().Summary();
+
+            if (cfg.validation_mode == configspec::ValidationMode::kWarning) {
+                impl_->failures.push_back(
+                    {entry.nickname, entry.uri, entry.driver,
+                     ec, "validate", detail});
+                continue;
+            }
+
+            // kStrict mode
+            if (cfg.skip_device_failures) {
+                ++result.devices_failed;
+                impl_->failures.push_back(
+                    {entry.nickname, entry.uri, entry.driver,
+                     ec, "validate", detail});
+                validation_failed_nicknames.insert(entry.nickname);
+                continue;
+            }
+
+            // Hard failure — rollback
+            dm.Reset();
+            if (impl_->properties_loaded) {
+                config::PropertyManager::GetInstance().Reset();
+                core::Properties::DestroyAll();
+                impl_->properties_loaded = false;
+            }
+            return core::Result<BootstrapResult>::Err(ec);
+        }
+    }
+
     // 5. Create + add devices individually
     for (const auto& entry : entries) {
+        // Skip devices that failed spec validation
+        if (validation_failed_nicknames.count(entry.nickname)) continue;
         // 5a. URI format validation (early detection)
         if (!ValidateUri(entry.uri)) {
             auto ec = core::make_error_code(core::ErrorCode::kInvalidArgument);

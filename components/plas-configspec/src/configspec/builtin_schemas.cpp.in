@@ -1,0 +1,16 @@
+#include <cstddef>
+
+namespace plas::configspec {
+
+struct BuiltinSpecEntry {
+    const char* name;
+    const char* content;
+};
+
+extern const BuiltinSpecEntry kBuiltinSpecs[] = {
+@PLAS_SCHEMA_ENTRIES@};
+
+extern const std::size_t kBuiltinSpecCount =
+    sizeof(kBuiltinSpecs) / sizeof(kBuiltinSpecs[0]);
+
+}  // namespace plas::configspec

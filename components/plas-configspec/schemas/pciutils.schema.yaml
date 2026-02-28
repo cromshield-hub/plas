@@ -1,0 +1,14 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: PciUtils Driver Args
+description: Configuration arguments for the PciUtils PCI/CXL driver
+type: object
+properties:
+  doe_timeout_ms:
+    type: integer
+    minimum: 0
+    description: DOE mailbox timeout in milliseconds (default 1000)
+  doe_poll_interval_us:
+    type: integer
+    minimum: 0
+    description: DOE mailbox poll interval in microseconds (default 100)
+additionalProperties: false

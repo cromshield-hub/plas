@@ -25,6 +25,8 @@ public:
     bool IsScalar() const;
     bool IsNull() const;
 
+    std::string Dump() const;
+
     ConfigNode();
     ~ConfigNode();
     ConfigNode(const ConfigNode&);

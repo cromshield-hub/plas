@@ -1,0 +1,29 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: PLAS Device Configuration
+description: Schema for PLAS device configuration files (flat format)
+type: object
+required:
+  - devices
+properties:
+  devices:
+    type: array
+    items:
+      type: object
+      required:
+        - nickname
+        - uri
+        - driver
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+        uri:
+          type: string
+          pattern: "^[a-zA-Z0-9_]+://[^:]+:.+$"
+        driver:
+          type: string
+          minLength: 1
+        args:
+          type: object
+      additionalProperties: false
+additionalProperties: false

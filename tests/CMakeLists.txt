@@ -158,6 +158,29 @@ gtest_discover_tests(test_bootstrap)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/bootstrap/fixtures/
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
 
+# ConfigSpec tests
+add_executable(test_validation_result configspec/test_validation_result.cpp)
+target_link_libraries(test_validation_result
+    PRIVATE plas::configspec GTest::gtest_main)
+gtest_discover_tests(test_validation_result)
+
+add_executable(test_spec_registry configspec/test_spec_registry.cpp)
+target_link_libraries(test_spec_registry
+    PRIVATE plas::configspec GTest::gtest_main)
+gtest_discover_tests(test_spec_registry)
+
+add_executable(test_validator configspec/test_validator.cpp)
+target_link_libraries(test_validator
+    PRIVATE plas::configspec GTest::gtest_main)
+gtest_discover_tests(test_validator)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/configspec/fixtures/
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
+
+# Copy spec source files for LoadSpecsFromDirectory tests
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../components/plas-configspec/schemas/
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/schemas/)
+
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)
     add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)

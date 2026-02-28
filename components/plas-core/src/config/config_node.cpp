@@ -101,4 +101,8 @@ bool ConfigNode::IsNull() const {
     return impl_->data_.is_null();
 }
 
+std::string ConfigNode::Dump() const {
+    return impl_->data_.dump();
+}
+
 }  // namespace plas::config

@@ -1,0 +1,7 @@
+devices:
+  - nickname: bad_dev
+    uri: "aardvark://0:0x50"
+    driver: aardvark
+    args:
+      bitrate: 100000
+      nonexistent_arg: 42

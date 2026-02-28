@@ -12,6 +12,7 @@
 #include "plas/core/result.h"
 #include "plas/hal/device_manager.h"
 #include "plas/log/log_config.h"
+#include "plas/configspec/validator.h"
 
 namespace plas::config {
 class PropertyManager;
@@ -33,6 +34,9 @@ struct BootstrapConfig {
     bool auto_open_devices = true;
     bool skip_unknown_drivers = true;
     bool skip_device_failures = true;
+
+    configspec::ValidationMode validation_mode = configspec::ValidationMode::kLenient;
+    std::string spec_dir;
 };
 
 struct DeviceFailure {

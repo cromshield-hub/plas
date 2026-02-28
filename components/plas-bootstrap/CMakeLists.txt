@@ -12,4 +12,4 @@ target_include_directories(plas_bootstrap
         $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(plas_bootstrap PUBLIC plas::hal_driver)
+target_link_libraries(plas_bootstrap PUBLIC plas::hal_driver plas::configspec)

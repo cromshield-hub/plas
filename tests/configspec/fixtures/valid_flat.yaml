@@ -1,0 +1,12 @@
+devices:
+  - nickname: dev0
+    uri: "aardvark://0:0x50"
+    driver: aardvark
+    args:
+      bitrate: 100000
+      pullup: true
+  - nickname: dev1
+    uri: "pciutils://0000:03:00.0"
+    driver: pciutils
+    args:
+      doe_timeout_ms: 2000

@@ -14,6 +14,16 @@ install(DIRECTORY components/plas-drivers/include/plas
     FILES_MATCHING PATTERN "*.h"
 )
 
+install(DIRECTORY components/plas-configspec/include/plas
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY components/plas-bootstrap/include/plas
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
 # Install plas library targets
 install(TARGETS
         plas_core
@@ -21,6 +31,8 @@ install(TARGETS
         plas_config
         plas_hal_interface
         plas_hal_driver
+        plas_configspec
+        plas_bootstrap
         plas_compiler_settings
     EXPORT PlasTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -63,6 +75,17 @@ install(TARGETS yaml-cpp
 install(EXPORT PlasDepYamlTargets
     FILE PlasYamlTargets.cmake
     NAMESPACE yaml-cpp::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/plas
+)
+
+install(TARGETS nlohmann_json_schema_validator
+    EXPORT PlasDepJsonSchemaValidatorTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(EXPORT PlasDepJsonSchemaValidatorTargets
+    FILE PlasJsonSchemaValidatorTargets.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/plas
 )
 

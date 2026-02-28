@@ -1,0 +1,5 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: PMU4 Driver Args
+description: Configuration arguments for the PMU4 power management driver
+type: object
+additionalProperties: true

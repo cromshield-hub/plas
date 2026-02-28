@@ -1,0 +1,27 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: FT4222H Driver Args
+description: Configuration arguments for the FT4222H dual-chip I2C driver
+type: object
+properties:
+  bitrate:
+    type: integer
+    minimum: 1
+    description: I2C bitrate in Hz (default 400000)
+  slave_addr:
+    type: integer
+    minimum: 0
+    maximum: 127
+    description: 7-bit I2C slave address (default 0x40)
+  sys_clock:
+    type: integer
+    enum: [24, 48, 60, 80]
+    description: System clock in MHz (default 60)
+  rx_timeout_ms:
+    type: integer
+    minimum: 0
+    description: Slave RX polling timeout in milliseconds (default 1000)
+  rx_poll_interval_us:
+    type: integer
+    minimum: 0
+    description: Slave RX polling interval in microseconds (default 100)
+additionalProperties: false

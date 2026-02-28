@@ -24,6 +24,7 @@ cd build && ctest --output-on-failure
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
 - `plas::hal::pci` — PCI/CXL domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciBar, PciTopology, Cxl, CxlMailbox)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
+- `plas::configspec` — JSON Schema (draft-07) based config spec validation (SpecRegistry, Validator)
 - `plas::bootstrap` — application initialization helper (Bootstrap class)
 
 ## CMake Targets
@@ -34,7 +35,8 @@ cd build && ctest --output-on-failure
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
 | `plas_hal_interface` | `plas_core`, `plas_log`, `plas_config` | |
 | `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | Aardvark SDK, FT4222H SDK, PMU3 SDK, PMU4 SDK, libpci — all optional |
-| `plas_bootstrap` | `plas_hal_driver` | |
+| `plas_configspec` | `plas_config` | nlohmann_json, json-schema-validator, yaml-cpp |
+| `plas_bootstrap` | `plas_hal_driver`, `plas_configspec` | |
 
 ## Key Design Decisions
 - **Error handling**: `std::error_code` + `Result<T>` (no exceptions)
@@ -69,6 +71,11 @@ plas/
 │   │   ├── CMakeLists.txt
 │   │   ├── include/plas/hal/driver/
 │   │   └── src/hal/driver/
+│   ├── plas-configspec/         ← JSON Schema config spec validation
+│   │   ├── CMakeLists.txt
+│   │   ├── include/plas/configspec/
+│   │   ├── src/configspec/
+│   │   └── schemas/            ← builtin *.schema.yaml files
 │   └── plas-bootstrap/         ← application initialization helper
 │       ├── CMakeLists.txt
 │       ├── include/plas/bootstrap/
@@ -112,11 +119,11 @@ plas/
 - **Class**: `Bootstrap` — single-call application initialization (replaces manual driver registration + config parsing + device lifecycle boilerplate)
 - **Header**: `components/plas-bootstrap/include/plas/bootstrap/bootstrap.h`
 - **Source**: `components/plas-bootstrap/src/bootstrap/bootstrap.cpp`
-- **Target**: `plas_bootstrap` (PUBLIC dep: `plas::hal_driver` — transitively includes hal_interface, config, log, core)
+- **Target**: `plas_bootstrap` (PUBLIC dep: `plas::hal_driver`, `plas::configspec` — transitively includes hal_interface, config, log, core)
 - **Namespace**: `plas::bootstrap`
 - **Types**:
-  - `BootstrapConfig` — device_config_path, device_config_key_path, device_config_node (optional ConfigNode), log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures
-  - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open"), detail (human-readable context)
+  - `BootstrapConfig` — device_config_path, device_config_key_path, device_config_node (optional ConfigNode), log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures, validation_mode (kLenient default), spec_dir
+  - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open"/"validate"), detail (human-readable context)
   - `BootstrapResult` — devices_opened, devices_failed, devices_skipped, failures vector
 - **API**:
   - `static RegisterAllDrivers()` — registers all available drivers (hides `#ifdef PLAS_HAS_*` guards)
@@ -128,13 +135,43 @@ plas/
   - `GetDevicesByInterface<T>()` — returns `vector<pair<nickname, T*>>` of all devices supporting interface T
   - `DeviceNames()`, `GetFailures()` — query accessors
   - `DumpDevices() → string` — formatted summary of all devices (nickname, URI, driver, state, interfaces) and failures for debugging
-- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromNode or Config::LoadFromFile → per-device ValidateUri + DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromNode or Config::LoadFromFile → **ConfigSpec validation (opt-in)** → per-device ValidateUri + DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **Config spec validation**: When `validation_mode` is not `kLenient`, registers builtin specs + loads `spec_dir`, then validates each DeviceEntry args against driver spec. `kWarning` logs and continues; `kStrict` with `skip_device_failures` skips device; `kStrict` without skip rolls back and fails
 - **In-memory config**: Set `device_config_node` (ConfigNode) to skip file I/O; node takes precedence over `device_config_path` when both are set
 - **URI validation**: Validates `driver://bus:identifier` format before device creation — catches malformed URIs at "create" phase with descriptive detail message
 - **Graceful degradation**: `skip_unknown_drivers` skips unregistered drivers, `skip_device_failures` skips individual device failures — both report via `BootstrapResult::failures` with detail strings
 - **Rollback**: Hard failure mid-init rolls back already-initialized subsystems in reverse order
 - **Pimpl**: Implementation hidden behind `struct Impl` (same pattern as Logger)
 - **Unit tests**: 69 tests in `tests/bootstrap/test_bootstrap.cpp`
+
+## ConfigSpec (`plas::configspec`)
+- **Purpose**: JSON Schema (draft-07) based validation for device config files and driver args — schema files can be dropped in without code changes
+- **Headers**: `components/plas-configspec/include/plas/configspec/{validation_result.h, spec_registry.h, validator.h}`
+- **Sources**: `components/plas-configspec/src/configspec/{spec_registry.cpp, validator.cpp, builtin_schemas.cpp.in}`
+- **Target**: `plas_configspec` (alias: `plas::configspec`), PUBLIC dep: `plas::config`, PRIVATE dep: nlohmann_json, json-schema-validator, yaml-cpp
+- **Namespace**: `plas::configspec`
+- **Types**:
+  - `Severity` enum — kError, kWarning
+  - `ValidationIssue` — severity, path (JSON pointer), message
+  - `ValidationResult` — valid flag, issues vector, Errors()/Warnings()/Summary() (header-only)
+  - `ValidationMode` enum — kStrict (reject), kWarning (log+continue), kLenient (no-op)
+- **SpecRegistry** (singleton):
+  - `RegisterBuiltinSpecs()` — loads 6 builtin specs from CMake-generated C++ arrays (idempotent)
+  - `RegisterDriverSpec(name, content, fmt)` / `RegisterDriverSpecFromFile()` — runtime registration
+  - `RegisterConfigSpec(content, fmt)` — register whole-config schema
+  - `HasDriverSpec(name)`, `HasConfigSpec()`, `RegisteredDrivers()` — query
+  - `ExportDriverSpec(name) → Result<string>` — JSON dump for tooling
+  - `LoadSpecsFromDirectory(dir) → Result<size_t>` — glob `*.schema.yaml`/`*.schema.json`/`*.spec.yaml`/`*.spec.json`
+  - `Reset()` — clear all (for testing)
+- **Validator**:
+  - `ValidateConfigFile(path, fmt)`, `ValidateConfigString(content, fmt)`, `ValidateConfigNode(node)` — whole-config validation against config spec
+  - `ValidateDeviceEntry(entry)` — validates `args` map against driver spec (string→typed JSON conversion)
+  - kLenient mode returns valid immediately (no-op)
+- **Builtin schemas** (6 files in `schemas/`): `device_config.schema.yaml`, `aardvark.schema.yaml`, `ft4222h.schema.yaml`, `pciutils.schema.yaml`, `pmu3.schema.yaml`, `pmu4.schema.yaml`
+- **CMake code generation**: `file(GLOB schemas/*.schema.yaml)` → raw string literals in `builtin_specs.cpp` via `configure_file()`
+- **YAML-to-JSON**: Replicated from plas-core's private `yaml_to_json.cpp` (~50 lines, intentional duplication to avoid dependency coupling)
+- **Unit tests**: 43 tests — `test_validation_result.cpp` (6), `test_spec_registry.cpp` (16), `test_validator.cpp` (21)
+- **Adding a new driver spec**: Drop `<driver>.schema.yaml` in `components/plas-configspec/schemas/` → `cmake -B build` → auto-embedded, no code changes
 
 ## PCI Topology (sysfs-based)
 - **Class**: `PciTopology` — static utility class for PCI topology traversal and device management
@@ -248,4 +285,5 @@ plas/
    - Add `vendor/<name>/{include, linux/x86_64, windows/x86_64}` directories
    - Add conditional block in `components/plas-drivers/CMakeLists.txt` (`PLAS_WITH_<NAME>` option + find + link + define)
 7. Add `Register()` call to `Bootstrap::RegisterAllDrivers()` in `components/plas-bootstrap/src/bootstrap/bootstrap.cpp` (guarded by `#ifdef PLAS_HAS_<NAME>` if SDK-dependent)
-8. Add tests in `tests/hal/` (unit tests always built, integration tests gated by `PLAS_HAS_<NAME>`)
+8. Add `<name>.schema.yaml` in `components/plas-configspec/schemas/` for config args validation (auto-embedded at build time)
+9. Add tests in `tests/hal/` (unit tests always built, integration tests gated by `PLAS_HAS_<NAME>`)

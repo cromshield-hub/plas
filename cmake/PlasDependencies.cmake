@@ -26,6 +26,18 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+# json-schema-validator - JSON Schema draft-07 validation
+FetchContent_Declare(
+    json-schema-validator
+    GIT_REPOSITORY https://github.com/pboettch/json-schema-validator.git
+    GIT_TAG        2.3.0
+    GIT_SHALLOW    TRUE
+)
+
+# Disable json-schema-validator tests/examples
+set(JSON_VALIDATOR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(JSON_VALIDATOR_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
 # Disable yaml-cpp tests/tools
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
@@ -42,4 +54,4 @@ if(PLAS_BUILD_TESTS)
     FetchContent_MakeAvailable(googletest)
 endif()
 
-FetchContent_MakeAvailable(spdlog nlohmann_json yaml-cpp)
+FetchContent_MakeAvailable(spdlog nlohmann_json yaml-cpp json-schema-validator)
