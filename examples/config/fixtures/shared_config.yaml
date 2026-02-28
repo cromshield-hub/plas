@@ -1,0 +1,13 @@
+plas:
+  devices:
+    aardvark:
+      - nickname: aardvark0
+        uri: "aardvark://0:0x50"
+        bitrate: 400000
+  settings:
+    timeout_ms: 5000
+    verbose: true
+libnvme:
+  buses:
+    - type: pcie
+      bdf: "01:00.0"
