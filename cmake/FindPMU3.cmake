@@ -2,8 +2,7 @@
 #
 # Search order:
 #   1. vendor/pmu3/ in the project source tree (platform/arch auto-detected)
-#   2. PMU3_ROOT CMake variable or environment variable
-#   3. System paths
+#   2. PMU3_ROOT CMake variable
 #
 # Defines:
 #   PMU3_FOUND            — TRUE if headers and the library were found
@@ -35,10 +34,6 @@ list(APPEND _pmu3_hints "${_pmu3_vendor_dir}")
 if(PMU3_ROOT)
     list(APPEND _pmu3_hints "${PMU3_ROOT}")
 endif()
-if(DEFINED ENV{PMU3_ROOT})
-    list(APPEND _pmu3_hints "$ENV{PMU3_ROOT}")
-endif()
-
 set(_pmu3_lib_suffixes
     "${_pmu3_platform}/${_pmu3_arch}"
     lib lib64
@@ -48,12 +43,14 @@ find_path(PMU3_INCLUDE_DIR
     NAMES pmu3.h
     HINTS ${_pmu3_hints}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
 )
 
 find_library(PMU3_LIBRARY
     NAMES pmu3
     HINTS ${_pmu3_hints}
     PATH_SUFFIXES ${_pmu3_lib_suffixes}
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)

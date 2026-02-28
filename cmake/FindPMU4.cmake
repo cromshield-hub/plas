@@ -2,8 +2,7 @@
 #
 # Search order:
 #   1. vendor/pmu4/ in the project source tree (platform/arch auto-detected)
-#   2. PMU4_ROOT CMake variable or environment variable
-#   3. System paths
+#   2. PMU4_ROOT CMake variable
 #
 # Defines:
 #   PMU4_FOUND            — TRUE if headers and the library were found
@@ -35,10 +34,6 @@ list(APPEND _pmu4_hints "${_pmu4_vendor_dir}")
 if(PMU4_ROOT)
     list(APPEND _pmu4_hints "${PMU4_ROOT}")
 endif()
-if(DEFINED ENV{PMU4_ROOT})
-    list(APPEND _pmu4_hints "$ENV{PMU4_ROOT}")
-endif()
-
 set(_pmu4_lib_suffixes
     "${_pmu4_platform}/${_pmu4_arch}"
     lib lib64
@@ -48,12 +43,14 @@ find_path(PMU4_INCLUDE_DIR
     NAMES pmu4.h
     HINTS ${_pmu4_hints}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
 )
 
 find_library(PMU4_LIBRARY
     NAMES pmu4
     HINTS ${_pmu4_hints}
     PATH_SUFFIXES ${_pmu4_lib_suffixes}
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)

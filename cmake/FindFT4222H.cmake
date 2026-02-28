@@ -2,8 +2,7 @@
 #
 # Search order:
 #   1. vendor/ft4222h/ in the project source tree (platform/arch auto-detected)
-#   2. FT4222H_ROOT CMake variable or environment variable
-#   3. System paths
+#   2. FT4222H_ROOT CMake variable
 #
 # Defines:
 #   FT4222H_FOUND         — TRUE if headers and the library were found
@@ -35,9 +34,6 @@ list(APPEND _ft4222h_hints "${_ft4222h_vendor_dir}")
 if(FT4222H_ROOT)
     list(APPEND _ft4222h_hints "${FT4222H_ROOT}")
 endif()
-if(DEFINED ENV{FT4222H_ROOT})
-    list(APPEND _ft4222h_hints "$ENV{FT4222H_ROOT}")
-endif()
 
 set(_ft4222h_lib_suffixes
     "${_ft4222h_platform}/${_ft4222h_arch}"
@@ -49,12 +45,14 @@ find_path(FT4222H_INCLUDE_DIR
     NAMES libft4222.h
     HINTS ${_ft4222h_hints}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
 )
 
 find_library(FT4222H_LIBRARY
-    NAMES ft4222
+    NAMES ft4222 LibFT4222-64 LibFT4222
     HINTS ${_ft4222h_hints}
     PATH_SUFFIXES ${_ft4222h_lib_suffixes}
+    NO_DEFAULT_PATH
 )
 
 # --- D2XX (ftd2xx) dependency — FT4222H requires it ---
@@ -62,12 +60,14 @@ find_path(FTD2XX_INCLUDE_DIR
     NAMES ftd2xx.h
     HINTS ${_ft4222h_hints}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
 )
 
 find_library(FTD2XX_LIBRARY
     NAMES ftd2xx
     HINTS ${_ft4222h_hints}
     PATH_SUFFIXES ${_ft4222h_lib_suffixes}
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)

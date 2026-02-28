@@ -2,8 +2,7 @@
 #
 # Search order:
 #   1. vendor/aardvark/ in the project source tree (platform/arch auto-detected)
-#   2. AARDVARK_ROOT CMake variable or environment variable
-#   3. System paths
+#   2. AARDVARK_ROOT CMake variable
 #
 # Defines:
 #   Aardvark_FOUND        — TRUE if aardvark.h and the library were found
@@ -35,9 +34,6 @@ list(APPEND _aardvark_hints "${_aardvark_vendor_dir}")
 if(AARDVARK_ROOT)
     list(APPEND _aardvark_hints "${AARDVARK_ROOT}")
 endif()
-if(DEFINED ENV{AARDVARK_ROOT})
-    list(APPEND _aardvark_hints "$ENV{AARDVARK_ROOT}")
-endif()
 
 # Library path suffixes: vendor layout + standard layouts
 set(_aardvark_lib_suffixes
@@ -49,12 +45,14 @@ find_path(AARDVARK_INCLUDE_DIR
     NAMES aardvark.h
     HINTS ${_aardvark_hints}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
 )
 
 find_library(AARDVARK_LIBRARY
     NAMES aardvark
     HINTS ${_aardvark_hints}
     PATH_SUFFIXES ${_aardvark_lib_suffixes}
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)
