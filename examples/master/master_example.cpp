@@ -5,11 +5,14 @@
 /// config parsing, device creation, init/open — all in one Init() call.
 ///
 ///  1. Bootstrap::Init() — registers drivers, loads config, opens devices
-///  2. List all loaded devices and check interface support
-///  3. I2C read on the first Aardvark
-///  4. PCI config register reads (Vendor/Device ID, Class Code, capabilities)
-///  5. PCI topology walk for the NVMe device
-///  6. Bootstrap::Deinit() — close all, cleanup
+///  2. DumpDevices() — quick audit of everything that was loaded
+///  3. GetDevicesByInterface<T>() — find all I2C-capable devices
+///  4. GetDeviceByUri() — look up a device by its URI
+///  5. DeviceFailure::detail — rich error reporting on failures
+///  6. I2C read on the first Aardvark
+///  7. PCI config register reads (Vendor/Device ID, Class Code, capabilities)
+///  8. PCI topology walk for the NVMe device
+///  9. Bootstrap::Deinit() — close all, cleanup
 ///
 /// Usage:
 ///   ./master_example                          -- run with default config
@@ -30,17 +33,6 @@
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-static const char* StateName(plas::hal::DeviceState s) {
-    switch (s) {
-        case plas::hal::DeviceState::kUninitialized: return "Uninitialized";
-        case plas::hal::DeviceState::kInitialized:   return "Initialized";
-        case plas::hal::DeviceState::kOpen:           return "Open";
-        case plas::hal::DeviceState::kClosed:         return "Closed";
-        case plas::hal::DeviceState::kError:          return "Error";
-    }
-    return "?";
-}
 
 static const char* PortTypeName(plas::hal::pci::PciePortType t) {
     switch (t) {
@@ -70,7 +62,7 @@ int main(int argc, char* argv[]) {
     const std::string config_path =
         (argc > 1) ? argv[1] : "fixtures/master_config.yaml";
 
-    std::printf("=== PLAS Master Example (Bootstrap) ===\n\n");
+    std::printf("=== PLAS Master Example (Bootstrap + DX Features) ===\n\n");
 
     // -----------------------------------------------------------------------
     // 1. Bootstrap::Init — one call does everything
@@ -92,37 +84,79 @@ int main(int argc, char* argv[]) {
     const auto& br = init_result.Value();
     std::printf("[1] Bootstrap complete: %zu opened, %zu failed, %zu skipped\n",
                 br.devices_opened, br.devices_failed, br.devices_skipped);
-    for (const auto& f : br.failures) {
-        std::printf("    SKIP: %s (%s) — %s at %s\n",
-                    f.nickname.c_str(), f.driver.c_str(),
-                    f.error.message().c_str(), f.phase.c_str());
+
+    // -----------------------------------------------------------------------
+    // 2. DumpDevices — one-call audit of all loaded devices
+    // -----------------------------------------------------------------------
+    std::printf("\n[2] DumpDevices() — config audit:\n");
+    std::printf("%s", bs.DumpDevices().c_str());
+
+    // -----------------------------------------------------------------------
+    // 3. GetDevicesByInterface<I2c> — find all I2C-capable devices
+    // -----------------------------------------------------------------------
+    std::printf("\n[3] GetDevicesByInterface<I2c>() — interface filtering:\n");
+    auto i2c_devices = bs.GetDevicesByInterface<I2c>();
+    if (i2c_devices.empty()) {
+        std::printf("    No I2C devices found\n");
+    } else {
+        std::printf("    Found %zu I2C device(s):\n", i2c_devices.size());
+        for (const auto& [name, iface] : i2c_devices) {
+            auto* dev = bs.GetDevice(name);
+            std::printf("      %-16s  %s  (bitrate: %u Hz)\n",
+                        name.c_str(),
+                        dev ? dev->GetUri().c_str() : "?",
+                        iface->GetBitrate());
+        }
     }
 
     // -----------------------------------------------------------------------
-    // 2. List devices + interface support
+    // 4. GetDeviceByUri — look up a specific device by URI
     // -----------------------------------------------------------------------
-    std::printf("\n[2] Devices and interface support:\n");
-    std::printf("    %-16s %-30s %-6s %-8s %-6s\n",
-                "Nickname", "URI", "State", "I2C", "PciCfg");
-    std::printf("    %-16s %-30s %-6s %-8s %-6s\n",
-                "--------", "---", "-----", "---", "------");
+    std::printf("\n[4] GetDeviceByUri() — URI-based lookup:\n");
+    const std::string lookup_uri = "aardvark://0:0x50";
+    auto* found = bs.GetDeviceByUri(lookup_uri);
+    if (found) {
+        std::printf("    Found \"%s\" for URI %s\n",
+                    found->GetName().c_str(), lookup_uri.c_str());
+    } else {
+        std::printf("    No device with URI %s\n", lookup_uri.c_str());
+    }
 
-    for (const auto& name : bs.DeviceNames()) {
-        auto* dev = bs.GetDevice(name);
-        if (!dev) continue;
-        bool has_i2c    = (bs.GetInterface<I2c>(name) != nullptr);
-        bool has_pcicfg = (bs.GetInterface<PciConfig>(name) != nullptr);
-        std::printf("    %-16s %-30s %-6s %-8s %-6s\n",
-                    name.c_str(), dev->GetUri().c_str(),
-                    StateName(dev->GetState()),
-                    has_i2c ? "yes" : "-",
-                    has_pcicfg ? "yes" : "-");
+    // Show ValidateUri as a static utility
+    std::printf("    ValidateUri examples:\n");
+    const char* test_uris[] = {
+        "aardvark://0:0x50",
+        "pciutils://0000:03:00.0",
+        "bad_uri_no_scheme",
+        "aardvark://missing_colon",
+    };
+    for (const auto* uri : test_uris) {
+        std::printf("      %-30s -> %s\n",
+                    uri, Bootstrap::ValidateUri(uri) ? "valid" : "INVALID");
     }
 
     // -----------------------------------------------------------------------
-    // 3. I2C read attempt on the first Aardvark
+    // 5. DeviceFailure::detail — rich error context
     // -----------------------------------------------------------------------
-    std::printf("\n[3] I2C read test (eeprom_reader):\n");
+    std::printf("\n[5] DeviceFailure detail — enhanced error reporting:\n");
+    const auto& failures = bs.GetFailures();
+    if (failures.empty()) {
+        std::printf("    No failures (all devices loaded successfully)\n");
+    } else {
+        for (const auto& f : failures) {
+            std::printf("    [%s] %s (%s): %s\n",
+                        f.phase.c_str(), f.nickname.c_str(), f.driver.c_str(),
+                        f.error.message().c_str());
+            if (!f.detail.empty()) {
+                std::printf("      detail: %s\n", f.detail.c_str());
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. I2C read attempt on the first Aardvark
+    // -----------------------------------------------------------------------
+    std::printf("\n[6] I2C read test (eeprom_reader):\n");
     auto* i2c = bs.GetInterface<I2c>("eeprom_reader");
     if (!i2c) {
         std::printf("    Skipped -- interface not available\n");
@@ -141,9 +175,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 4. PCI config register reads on the NVMe device
+    // 7. PCI config register reads on the NVMe device
     // -----------------------------------------------------------------------
-    std::printf("\n[4] PCI config read (nvme0):\n");
+    std::printf("\n[7] PCI config read (nvme0):\n");
     auto* pcicfg = bs.GetInterface<PciConfig>("nvme0");
     if (!pcicfg) {
         std::printf("    Skipped -- PciConfig interface not available\n");
@@ -190,9 +224,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 5. PCI topology walk for the NVMe device
+    // 8. PCI topology walk for the NVMe device
     // -----------------------------------------------------------------------
-    std::printf("\n[5] PCI topology walk (nvme0):\n");
+    std::printf("\n[8] PCI topology walk (nvme0):\n");
     {
         auto* nvme_dev = bs.GetDevice("nvme0");
         if (!nvme_dev) {
@@ -223,9 +257,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 6. Cleanup — let Bootstrap handle it
+    // 9. Cleanup — let Bootstrap handle it
     // -----------------------------------------------------------------------
-    std::printf("\n[6] Shutting down...\n");
+    std::printf("\n[9] Shutting down...\n");
     bs.Deinit();
 
     std::printf("\n=== Done ===\n");
