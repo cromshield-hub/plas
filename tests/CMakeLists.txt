@@ -13,6 +13,10 @@ add_executable(test_core_units core/test_units.cpp)
 target_link_libraries(test_core_units PRIVATE plas::core GTest::gtest_main)
 gtest_discover_tests(test_core_units)
 
+add_executable(test_core_properties core/test_properties.cpp)
+target_link_libraries(test_core_properties PRIVATE plas::core GTest::gtest_main)
+gtest_discover_tests(test_core_properties)
+
 # Log tests
 add_executable(test_logger log/test_logger.cpp)
 target_link_libraries(test_logger PRIVATE plas::log GTest::gtest_main)
@@ -26,6 +30,10 @@ gtest_discover_tests(test_config_json)
 add_executable(test_config_yaml config/test_config_yaml.cpp)
 target_link_libraries(test_config_yaml PRIVATE plas::config GTest::gtest_main)
 gtest_discover_tests(test_config_yaml)
+
+add_executable(test_property_manager config/test_property_manager.cpp)
+target_link_libraries(test_property_manager PRIVATE plas::config GTest::gtest_main)
+gtest_discover_tests(test_property_manager)
 
 # Copy test fixtures to build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/config/fixtures/

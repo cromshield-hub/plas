@@ -1,0 +1,16 @@
+{
+  "global": {
+    "app_name": "my_app",
+    "version": "1.0.0",
+    "debug": true
+  },
+  "device_config": {
+    "bitrate": 400000,
+    "address": 80,
+    "timeout_ms": 1000,
+    "advanced": {
+      "retry_count": 3,
+      "verbose": true
+    }
+  }
+}

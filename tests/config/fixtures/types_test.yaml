@@ -1,0 +1,11 @@
+types:
+  int_val: 42
+  neg_int: -10
+  float_val: 3.14
+  bool_true: true
+  bool_false: false
+  str_val: "hello"
+  null_val: ~
+  array_val: [1, 2, 3]
+  nested:
+    deep: "value"

@@ -37,6 +37,18 @@ std::string PlasErrorCategory::message(int code) const {
             return "Permission denied";
         case ErrorCode::kOutOfMemory:
             return "Out of memory";
+        case ErrorCode::kTypeMismatch:
+            return "Type mismatch";
+        case ErrorCode::kOutOfRange:
+            return "Out of range";
+        case ErrorCode::kOverflow:
+            return "Overflow";
+        case ErrorCode::kResourceExhausted:
+            return "Resource exhausted";
+        case ErrorCode::kCancelled:
+            return "Cancelled";
+        case ErrorCode::kDataLoss:
+            return "Data loss";
         case ErrorCode::kInternalError:
             return "Internal error";
         case ErrorCode::kUnknown:

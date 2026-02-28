@@ -18,6 +18,12 @@ enum class ErrorCode : int {
     kAlreadyClosed,
     kPermissionDenied,
     kOutOfMemory,
+    kTypeMismatch,
+    kOutOfRange,
+    kOverflow,
+    kResourceExhausted,
+    kCancelled,
+    kDataLoss,
     kInternalError,
     kUnknown
 };

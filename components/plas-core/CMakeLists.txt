@@ -6,6 +6,7 @@ add_library(plas_core
     src/core/error.cpp
     src/core/version.cpp
     src/core/byte_buffer.cpp
+    src/core/properties.cpp
 )
 add_library(plas::core ALIAS plas_core)
 
@@ -49,6 +50,9 @@ add_library(plas_config
     src/config/config.cpp
     src/config/json_parser.cpp
     src/config/yaml_parser.cpp
+    src/config/property_manager.cpp
+    src/config/json_property_parser.cpp
+    src/config/yaml_property_parser.cpp
 )
 add_library(plas::config ALIAS plas_config)
 

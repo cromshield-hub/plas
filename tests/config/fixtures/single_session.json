@@ -1,0 +1,10 @@
+{
+  "bitrate": 400000,
+  "address": 80,
+  "timeout_ms": 1000,
+  "ratio": 3.14,
+  "advanced": {
+    "retry_count": 3,
+    "verbose": true
+  }
+}
