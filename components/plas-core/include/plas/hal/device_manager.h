@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "plas/config/config.h"
@@ -38,9 +39,13 @@ public:
                                   std::unique_ptr<Device> device);
 
     Device* GetDevice(const std::string& nickname);
+    Device* GetDeviceByUri(const std::string& uri);
 
     template <typename T>
     T* GetInterface(const std::string& nickname);
+
+    template <typename T>
+    std::vector<std::pair<std::string, T*>> GetDevicesByInterface();
 
     std::vector<std::string> DeviceNames() const;
     bool HasDevice(const std::string& nickname) const;
@@ -66,6 +71,19 @@ T* DeviceManager::GetInterface(const std::string& nickname) {
     auto* device = GetDevice(nickname);
     if (!device) return nullptr;
     return dynamic_cast<T*>(device);
+}
+
+template <typename T>
+std::vector<std::pair<std::string, T*>> DeviceManager::GetDevicesByInterface() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::pair<std::string, T*>> result;
+    for (auto& [name, device] : devices_) {
+        auto* iface = dynamic_cast<T*>(device.get());
+        if (iface) {
+            result.emplace_back(name, iface);
+        }
+    }
+    return result;
 }
 
 }  // namespace plas::hal

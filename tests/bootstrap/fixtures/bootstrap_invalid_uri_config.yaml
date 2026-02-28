@@ -1,4 +1,4 @@
 devices:
   - nickname: bad_aardvark
     driver: aardvark
-    uri: "aardvark://invalid_uri_format"
+    uri: "aardvark://abc:xyz"

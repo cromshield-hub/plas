@@ -509,3 +509,207 @@ TEST_F(BootstrapTest, CanReinitAfterDeinit) {
     EXPECT_TRUE(bs.IsInitialized());
     EXPECT_EQ(r2.Value().devices_opened, 2u);
 }
+
+// ===========================================================================
+// GetDeviceByUri
+// ===========================================================================
+
+TEST_F(BootstrapTest, GetDeviceByUriFound) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto* dev = bs.GetDeviceByUri("aardvark://0:0x50");
+    ASSERT_NE(dev, nullptr);
+    EXPECT_EQ(dev->GetUri(), "aardvark://0:0x50");
+}
+
+TEST_F(BootstrapTest, GetDeviceByUriNotFound) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto* dev = bs.GetDeviceByUri("aardvark://99:0xFF");
+    EXPECT_EQ(dev, nullptr);
+}
+
+TEST_F(BootstrapTest, GetDeviceByUriBeforeInit) {
+    Bootstrap bs;
+    auto* dev = bs.GetDeviceByUri("aardvark://0:0x50");
+    EXPECT_EQ(dev, nullptr);
+}
+
+// ===========================================================================
+// GetDevicesByInterface
+// ===========================================================================
+
+TEST_F(BootstrapTest, GetDevicesByInterfaceI2c) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto i2c_devices = bs.GetDevicesByInterface<I2c>();
+    ASSERT_EQ(i2c_devices.size(), 2u);  // both aardvarks support I2c
+    // Map is sorted, so aardvark0 first
+    EXPECT_EQ(i2c_devices[0].first, "aardvark0");
+    EXPECT_NE(i2c_devices[0].second, nullptr);
+    EXPECT_EQ(i2c_devices[1].first, "aardvark1");
+    EXPECT_NE(i2c_devices[1].second, nullptr);
+}
+
+TEST_F(BootstrapTest, GetDevicesByInterfaceNoneMatch) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto power_devices = bs.GetDevicesByInterface<PowerControl>();
+    EXPECT_TRUE(power_devices.empty());
+}
+
+TEST_F(BootstrapTest, GetDevicesByInterfaceBeforeInit) {
+    Bootstrap bs;
+    auto i2c_devices = bs.GetDevicesByInterface<I2c>();
+    EXPECT_TRUE(i2c_devices.empty());
+}
+
+// ===========================================================================
+// DumpDevices
+// ===========================================================================
+
+TEST_F(BootstrapTest, DumpDevicesAfterInit) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto dump = bs.DumpDevices();
+    EXPECT_FALSE(dump.empty());
+    EXPECT_NE(dump.find("Devices (2)"), std::string::npos);
+    EXPECT_NE(dump.find("aardvark0"), std::string::npos);
+    EXPECT_NE(dump.find("aardvark1"), std::string::npos);
+    EXPECT_NE(dump.find("aardvark://0:0x50"), std::string::npos);
+    EXPECT_NE(dump.find("I2c"), std::string::npos);
+    EXPECT_NE(dump.find("open"), std::string::npos);
+}
+
+TEST_F(BootstrapTest, DumpDevicesIncludesFailures) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
+    cfg.skip_unknown_drivers = true;
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    auto dump = bs.DumpDevices();
+    EXPECT_NE(dump.find("Failures (1)"), std::string::npos);
+    EXPECT_NE(dump.find("fake0"), std::string::npos);
+}
+
+TEST_F(BootstrapTest, DumpDevicesEmpty) {
+    Bootstrap bs;
+    auto dump = bs.DumpDevices();
+    EXPECT_NE(dump.find("Devices (0)"), std::string::npos);
+}
+
+// ===========================================================================
+// ValidateUri
+// ===========================================================================
+
+TEST_F(BootstrapTest, ValidateUriValid) {
+    EXPECT_TRUE(Bootstrap::ValidateUri("aardvark://0:0x50"));
+    EXPECT_TRUE(Bootstrap::ValidateUri("ft4222h://0:1"));
+    EXPECT_TRUE(Bootstrap::ValidateUri("pciutils://0000:03:00.0"));
+    EXPECT_TRUE(Bootstrap::ValidateUri("pmu3://usb:PMU3-001"));
+}
+
+TEST_F(BootstrapTest, ValidateUriMissingScheme) {
+    EXPECT_FALSE(Bootstrap::ValidateUri("0:0x50"));
+    EXPECT_FALSE(Bootstrap::ValidateUri("://0:0x50"));
+}
+
+TEST_F(BootstrapTest, ValidateUriMissingColon) {
+    EXPECT_FALSE(Bootstrap::ValidateUri("aardvark://invalid_uri_format"));
+}
+
+TEST_F(BootstrapTest, ValidateUriEmptyParts) {
+    EXPECT_FALSE(Bootstrap::ValidateUri("aardvark://:0x50"));
+    EXPECT_FALSE(Bootstrap::ValidateUri("aardvark://0:"));
+    EXPECT_FALSE(Bootstrap::ValidateUri(""));
+}
+
+TEST_F(BootstrapTest, ValidateUriEmptyAuthority) {
+    EXPECT_FALSE(Bootstrap::ValidateUri("aardvark://"));
+}
+
+// ===========================================================================
+// URI validation during Init
+// ===========================================================================
+
+TEST_F(BootstrapTest, InitUriValidationCatchesBadFormat) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_bad_uri_format_config.yaml");
+    cfg.skip_device_failures = true;
+
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+    EXPECT_EQ(result.Value().devices_failed, 1u);
+    EXPECT_EQ(result.Value().failures.size(), 1u);
+    EXPECT_EQ(result.Value().failures[0].nickname, "bad_format");
+    EXPECT_EQ(result.Value().failures[0].phase, "create");
+    EXPECT_NE(result.Value().failures[0].detail.find("invalid URI format"),
+              std::string::npos);
+}
+
+TEST_F(BootstrapTest, InitUriValidationStrictModeFails) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_bad_uri_format_config.yaml");
+    cfg.skip_device_failures = false;
+
+    auto result = bs.Init(cfg);
+    EXPECT_TRUE(result.IsError());
+    EXPECT_EQ(result.Error(),
+              plas::core::make_error_code(ErrorCode::kInvalidArgument));
+}
+
+// ===========================================================================
+// DeviceFailure detail field
+// ===========================================================================
+
+TEST_F(BootstrapTest, FailureDetailOnUnknownDriver) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
+    cfg.skip_unknown_drivers = true;
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    const auto& failures = bs.GetFailures();
+    ASSERT_EQ(failures.size(), 1u);
+    EXPECT_FALSE(failures[0].detail.empty());
+    EXPECT_NE(failures[0].detail.find("not registered"), std::string::npos);
+}
+
+TEST_F(BootstrapTest, FailureDetailOnInitError) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_path = FixturePath("bootstrap_invalid_uri_config.yaml");
+    cfg.skip_device_failures = true;
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk());
+
+    const auto& failures = bs.GetFailures();
+    ASSERT_EQ(failures.size(), 1u);
+    EXPECT_FALSE(failures[0].detail.empty());
+    EXPECT_NE(failures[0].detail.find("init failed"), std::string::npos);
+}

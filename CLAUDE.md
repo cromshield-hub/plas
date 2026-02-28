@@ -116,18 +116,24 @@ plas/
 - **Namespace**: `plas::bootstrap`
 - **Types**:
   - `BootstrapConfig` — device_config_path, device_config_key_path, log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures
-  - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open")
+  - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open"), detail (human-readable context)
   - `BootstrapResult` — devices_opened, devices_failed, devices_skipped, failures vector
 - **API**:
   - `static RegisterAllDrivers()` — registers all available drivers (hides `#ifdef PLAS_HAS_*` guards)
-  - `Init(BootstrapConfig) → Result<BootstrapResult>` — full init sequence: register drivers → logger → properties → config parse → device create/init/open
+  - `static ValidateUri(uri) → bool` — validates `driver://bus:identifier` format
+  - `Init(BootstrapConfig) → Result<BootstrapResult>` — full init sequence: register drivers → logger → properties → config parse → URI validate → device create/init/open
   - `Deinit()` — reverse teardown (idempotent, also called by destructor)
-  - `GetDevice()`, `GetInterface<T>()`, `DeviceNames()`, `GetFailures()` — convenience accessors
-- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromFile → per-device DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
-- **Graceful degradation**: `skip_unknown_drivers` skips unregistered drivers, `skip_device_failures` skips individual device failures — both report via `BootstrapResult::failures`
+  - `GetDevice(nickname)`, `GetDeviceByUri(uri)` — device lookup by nickname or URI
+  - `GetInterface<T>(nickname)` — single device interface cast
+  - `GetDevicesByInterface<T>()` — returns `vector<pair<nickname, T*>>` of all devices supporting interface T
+  - `DeviceNames()`, `GetFailures()` — query accessors
+  - `DumpDevices() → string` — formatted summary of all devices (nickname, URI, driver, state, interfaces) and failures for debugging
+- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromFile → per-device ValidateUri + DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **URI validation**: Validates `driver://bus:identifier` format before device creation — catches malformed URIs at "create" phase with descriptive detail message
+- **Graceful degradation**: `skip_unknown_drivers` skips unregistered drivers, `skip_device_failures` skips individual device failures — both report via `BootstrapResult::failures` with detail strings
 - **Rollback**: Hard failure mid-init rolls back already-initialized subsystems in reverse order
 - **Pimpl**: Implementation hidden behind `struct Impl` (same pattern as Logger)
-- **Unit tests**: 40 tests in `tests/bootstrap/test_bootstrap.cpp`
+- **Unit tests**: 64 tests in `tests/bootstrap/test_bootstrap.cpp`
 
 ## PCI Topology (sysfs-based)
 - **Class**: `PciTopology` — static utility class for PCI topology traversal and device management

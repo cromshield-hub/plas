@@ -4,6 +4,7 @@
 #include "plas/hal/interface/device.h"
 #include "plas/hal/interface/i2c.h"
 #include "plas/hal/interface/power_control.h"
+#include "plas/hal/interface/serial.h"
 #include "plas/hal/interface/ssd_gpio.h"
 #include "plas/config/config_node.h"
 #include "plas/config/device_entry.h"
@@ -19,6 +20,7 @@ using plas::hal::DeviceManager;
 using plas::hal::DeviceState;
 using plas::hal::I2c;
 using plas::hal::PowerControl;
+using plas::hal::Serial;
 using plas::hal::SsdGpio;
 using plas::config::DeviceEntry;
 
@@ -303,4 +305,67 @@ TEST_F(DeviceManagerTest, LoadFromConfigGroupedYaml) {
     EXPECT_EQ(mgr.DeviceCount(), 2u);
     EXPECT_TRUE(mgr.HasDevice("aardvark0"));
     EXPECT_TRUE(mgr.HasDevice("pmu3_main"));
+}
+
+// --- GetDeviceByUri tests ---
+
+TEST_F(DeviceManagerTest, GetDeviceByUriFound) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_test.json"));
+    ASSERT_TRUE(result.IsOk());
+
+    auto* device = mgr.GetDeviceByUri("aardvark://0:0x50");
+    ASSERT_NE(device, nullptr);
+    EXPECT_EQ(device->GetUri(), "aardvark://0:0x50");
+}
+
+TEST_F(DeviceManagerTest, GetDeviceByUriNotFound) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_test.json"));
+    ASSERT_TRUE(result.IsOk());
+
+    auto* device = mgr.GetDeviceByUri("aardvark://99:0xFF");
+    EXPECT_EQ(device, nullptr);
+}
+
+TEST_F(DeviceManagerTest, GetDeviceByUriEmpty) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto* device = mgr.GetDeviceByUri("aardvark://0:0x50");
+    EXPECT_EQ(device, nullptr);
+}
+
+// --- GetDevicesByInterface tests ---
+
+TEST_F(DeviceManagerTest, GetDevicesByInterfaceI2c) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_test.json"));
+    ASSERT_TRUE(result.IsOk());
+
+    auto i2c_devices = mgr.GetDevicesByInterface<I2c>();
+    // aardvark0 supports I2c
+    EXPECT_GE(i2c_devices.size(), 1u);
+    bool found = false;
+    for (const auto& [name, iface] : i2c_devices) {
+        if (name == "aardvark0") {
+            found = true;
+            EXPECT_NE(iface, nullptr);
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST_F(DeviceManagerTest, GetDevicesByInterfaceNoneMatch) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_test.json"));
+    ASSERT_TRUE(result.IsOk());
+
+    // No driver implements Serial
+    auto serial_devices = mgr.GetDevicesByInterface<Serial>();
+    EXPECT_TRUE(serial_devices.empty());
+}
+
+TEST_F(DeviceManagerTest, GetDevicesByInterfaceEmptyManager) {
+    auto& mgr = DeviceManager::GetInstance();
+    auto i2c_devices = mgr.GetDevicesByInterface<I2c>();
+    EXPECT_TRUE(i2c_devices.empty());
 }

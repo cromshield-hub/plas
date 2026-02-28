@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "plas/config/config_format.h"
@@ -37,7 +38,8 @@ struct DeviceFailure {
     std::string uri;
     std::string driver;
     std::error_code error;
-    std::string phase;  // "create", "init", "open"
+    std::string phase;   // "create", "init", "open"
+    std::string detail;  // human-readable context (driver-specific)
 };
 
 struct BootstrapResult {
@@ -61,6 +63,9 @@ public:
     /// Register all available drivers (hides #ifdef guards internally).
     static void RegisterAllDrivers();
 
+    /// Validate URI format: "driver://bus:identifier".
+    static bool ValidateUri(const std::string& uri);
+
     /// Run the full initialization sequence.
     core::Result<BootstrapResult> Init(const BootstrapConfig& config);
 
@@ -73,12 +78,19 @@ public:
     config::PropertyManager* GetPropertyManager();
 
     hal::Device* GetDevice(const std::string& nickname);
+    hal::Device* GetDeviceByUri(const std::string& uri);
 
     template <typename T>
     T* GetInterface(const std::string& nickname);
 
+    template <typename T>
+    std::vector<std::pair<std::string, T*>> GetDevicesByInterface();
+
     std::vector<std::string> DeviceNames() const;
     const std::vector<DeviceFailure>& GetFailures() const;
+
+    /// Return a formatted summary of all loaded devices (for debugging).
+    std::string DumpDevices() const;
 
 private:
     struct Impl;
@@ -92,6 +104,11 @@ T* Bootstrap::GetInterface(const std::string& nickname) {
     auto* device = GetDevice(nickname);
     if (!device) return nullptr;
     return dynamic_cast<T*>(device);
+}
+
+template <typename T>
+std::vector<std::pair<std::string, T*>> Bootstrap::GetDevicesByInterface() {
+    return hal::DeviceManager::GetInstance().GetDevicesByInterface<T>();
 }
 
 }  // namespace plas::bootstrap

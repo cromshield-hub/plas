@@ -83,7 +83,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | Config (PropertyManager) | 31 | **Pass** |
 | Config (errors) | 21 | **Pass** |
 | HAL (device_factory) | 11 | **Pass** |
-| HAL (device_manager) | 24 | **Pass** |
+| HAL (device_manager) | 30 | **Pass** |
 | HAL (device_lifecycle) | 14 | **Pass** |
 | PCI (types, config, doe) | 47 | **Pass** |
 | PCI (topology) | 17 | **Pass** |
@@ -95,8 +95,8 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | HAL (ft4222h integration) | — | **Skip** (env-gated, `PLAS_TEST_FT4222H_PORT`) |
 | HAL (pciutils unit) | — | **Skip** (libpci 필요) |
 | HAL (pciutils integration) | — | **Skip** (env-gated, `PLAS_TEST_PCIUTILS_BDF`) |
-| Bootstrap | 40 | **Pass** |
-| **합계** | **442** | **All Pass** (442 run, integration skipped) |
+| Bootstrap | 64 | **Pass** |
+| **합계** | **466** | **All Pass** (466 run, integration skipped) |
 
 ---
 
@@ -151,6 +151,14 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - `DeviceManager::AddDevice()` 메서드 추가 (개별 디바이스 추가 지원)
   - Pimpl 패턴, move-only, RAII
   - 40 tests, `master_example` 리팩토링 (349→213줄)
+- [x] Bootstrap DX 개선 — 5가지 Quick Win (2026-02-28)
+  - `GetDeviceByUri(uri)` — URI 기반 디바이스 검색 (DeviceManager + Bootstrap)
+  - `GetDevicesByInterface<T>()` — 인터페이스 타입별 디바이스 필터링 (`vector<pair<nickname, T*>>`)
+  - `DumpDevices()` — 로드된 디바이스 설정 덤프 (nickname, URI, driver, state, 지원 인터페이스)
+  - URI 포맷 검증 — Init 시 `driver://bus:identifier` 포맷 조기 검증, 상세 에러 메시지
+  - `DeviceFailure::detail` — 드라이버별 상세 에러 컨텍스트 (generic error code 보완)
+  - DeviceManager에도 `GetDeviceByUri()`, `GetDevicesByInterface<T>()` 추가
+  - 24 신규 테스트 (Bootstrap 18 + DeviceManager 6), 총 466 테스트
 
 ### P1 — Examples
 

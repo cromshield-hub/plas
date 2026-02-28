@@ -76,6 +76,16 @@ Device* DeviceManager::GetDevice(const std::string& nickname) {
     return it->second.get();
 }
 
+Device* DeviceManager::GetDeviceByUri(const std::string& uri) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto& [_, device] : devices_) {
+        if (device->GetUri() == uri) {
+            return device.get();
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::string> DeviceManager::DeviceNames() const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> names;

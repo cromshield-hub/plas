@@ -1,11 +1,22 @@
 #include "plas/bootstrap/bootstrap.h"
 
+#include <sstream>
 #include <utility>
 
 #include "plas/config/config.h"
 #include "plas/config/property_manager.h"
 #include "plas/core/properties.h"
 #include "plas/hal/interface/device_factory.h"
+#include "plas/hal/interface/i2c.h"
+#include "plas/hal/interface/i3c.h"
+#include "plas/hal/interface/power_control.h"
+#include "plas/hal/interface/serial.h"
+#include "plas/hal/interface/ssd_gpio.h"
+#include "plas/hal/interface/uart.h"
+#include "plas/hal/interface/pci/pci_config.h"
+#include "plas/hal/interface/pci/pci_doe.h"
+#include "plas/hal/interface/pci/cxl.h"
+#include "plas/hal/interface/pci/cxl_mailbox.h"
 #include "plas/log/logger.h"
 
 #include "plas/hal/driver/aardvark/aardvark_device.h"
@@ -17,6 +28,57 @@
 #endif
 
 namespace plas::bootstrap {
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Build a detail string for a DeviceFailure from error_code.
+std::string MakeDetail(const std::string& phase, std::error_code ec) {
+    std::string msg = phase + " failed: " + ec.message();
+    if (ec.category().name() != std::string("plas")) {
+        msg += " [" + std::string(ec.category().name()) + "]";
+    }
+    return msg;
+}
+
+/// Convert DeviceState enum to readable string.
+const char* StateToString(hal::DeviceState state) {
+    switch (state) {
+        case hal::DeviceState::kUninitialized: return "uninitialized";
+        case hal::DeviceState::kInitialized:   return "initialized";
+        case hal::DeviceState::kOpen:           return "open";
+        case hal::DeviceState::kClosed:         return "closed";
+        case hal::DeviceState::kError:          return "error";
+    }
+    return "unknown";
+}
+
+/// Probe all known HAL interface types and return comma-separated list.
+std::string ProbeInterfaces(hal::Device* dev) {
+    std::string result;
+    auto append = [&](const char* name) {
+        if (!result.empty()) result += ", ";
+        result += name;
+    };
+
+    if (dynamic_cast<hal::I2c*>(dev))              append("I2c");
+    if (dynamic_cast<hal::I3c*>(dev))              append("I3c");
+    if (dynamic_cast<hal::PowerControl*>(dev))     append("PowerControl");
+    if (dynamic_cast<hal::Serial*>(dev))           append("Serial");
+    if (dynamic_cast<hal::Uart*>(dev))             append("Uart");
+    if (dynamic_cast<hal::SsdGpio*>(dev))          append("SsdGpio");
+    if (dynamic_cast<hal::pci::PciConfig*>(dev))   append("PciConfig");
+    if (dynamic_cast<hal::pci::PciDoe*>(dev))      append("PciDoe");
+    if (dynamic_cast<hal::pci::Cxl*>(dev))         append("Cxl");
+    if (dynamic_cast<hal::pci::CxlMailbox*>(dev))  append("CxlMailbox");
+
+    return result.empty() ? "(none)" : result;
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Impl
@@ -56,6 +118,32 @@ void Bootstrap::RegisterAllDrivers() {
 #ifdef PLAS_HAS_PCIUTILS
     hal::driver::PciUtilsDevice::Register();
 #endif
+}
+
+// ---------------------------------------------------------------------------
+// ValidateUri
+// ---------------------------------------------------------------------------
+
+bool Bootstrap::ValidateUri(const std::string& uri) {
+    // Expected format: driver://bus:identifier
+    auto scheme_end = uri.find("://");
+    if (scheme_end == std::string::npos || scheme_end == 0) {
+        return false;
+    }
+
+    auto authority = uri.substr(scheme_end + 3);
+    if (authority.empty()) {
+        return false;
+    }
+
+    // Must contain at least one colon separating bus and identifier
+    auto colon = authority.find(':');
+    if (colon == std::string::npos || colon == 0 ||
+        colon == authority.size() - 1) {
+        return false;
+    }
+
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +208,27 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
 
     // 5. Create + add devices individually
     for (const auto& entry : entries) {
+        // 5a. URI format validation (early detection)
+        if (!ValidateUri(entry.uri)) {
+            auto ec = core::make_error_code(core::ErrorCode::kInvalidArgument);
+            std::string detail = "invalid URI format: \"" + entry.uri +
+                                 "\" (expected driver://bus:identifier)";
+            if (cfg.skip_device_failures) {
+                ++result.devices_failed;
+                impl_->failures.push_back(
+                    {entry.nickname, entry.uri, entry.driver,
+                     ec, "create", detail});
+                continue;
+            }
+            dm.Reset();
+            if (impl_->properties_loaded) {
+                config::PropertyManager::GetInstance().Reset();
+                core::Properties::DestroyAll();
+                impl_->properties_loaded = false;
+            }
+            return core::Result<BootstrapResult>::Err(ec);
+        }
+
         auto create = hal::DeviceFactory::CreateFromConfig(entry);
         if (create.IsError()) {
             if (create.Error() ==
@@ -128,14 +237,17 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
                 ++result.devices_skipped;
                 impl_->failures.push_back(
                     {entry.nickname, entry.uri, entry.driver,
-                     create.Error(), "create"});
+                     create.Error(), "create",
+                     MakeDetail("create", create.Error()) +
+                         " (driver \"" + entry.driver + "\" not registered)"});
                 continue;
             }
             if (cfg.skip_device_failures) {
                 ++result.devices_failed;
                 impl_->failures.push_back(
                     {entry.nickname, entry.uri, entry.driver,
-                     create.Error(), "create"});
+                     create.Error(), "create",
+                     MakeDetail("create", create.Error())});
                 continue;
             }
             // Hard failure — rollback
@@ -154,7 +266,8 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
                 ++result.devices_failed;
                 impl_->failures.push_back(
                     {entry.nickname, entry.uri, entry.driver,
-                     add.Error(), "create"});
+                     add.Error(), "create",
+                     MakeDetail("create", add.Error())});
                 continue;
             }
             dm.Reset();
@@ -179,7 +292,8 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
                     ++result.devices_failed;
                     impl_->failures.push_back(
                         {name, dev->GetUri(), dev->GetName(),
-                         init.Error(), "init"});
+                         init.Error(), "init",
+                         MakeDetail("init", init.Error())});
                     continue;
                 }
                 dm.Reset();
@@ -197,7 +311,8 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
                     ++result.devices_failed;
                     impl_->failures.push_back(
                         {name, dev->GetUri(), dev->GetName(),
-                         open.Error(), "open"});
+                         open.Error(), "open",
+                         MakeDetail("open", open.Error())});
                     continue;
                 }
                 dm.Reset();
@@ -262,12 +377,53 @@ hal::Device* Bootstrap::GetDevice(const std::string& nickname) {
     return hal::DeviceManager::GetInstance().GetDevice(nickname);
 }
 
+hal::Device* Bootstrap::GetDeviceByUri(const std::string& uri) {
+    return hal::DeviceManager::GetInstance().GetDeviceByUri(uri);
+}
+
 std::vector<std::string> Bootstrap::DeviceNames() const {
     return hal::DeviceManager::GetInstance().DeviceNames();
 }
 
 const std::vector<DeviceFailure>& Bootstrap::GetFailures() const {
     return impl_->failures;
+}
+
+// ---------------------------------------------------------------------------
+// DumpDevices
+// ---------------------------------------------------------------------------
+
+std::string Bootstrap::DumpDevices() const {
+    auto& dm = hal::DeviceManager::GetInstance();
+    auto names = dm.DeviceNames();
+
+    std::ostringstream os;
+    os << "Devices (" << names.size() << "):\n";
+
+    for (const auto& name : names) {
+        auto* dev = dm.GetDevice(name);
+        if (!dev) continue;
+
+        os << "  " << name << "\n"
+           << "    uri:        " << dev->GetUri() << "\n"
+           << "    driver:     " << dev->GetName() << "\n"
+           << "    state:      " << StateToString(dev->GetState()) << "\n"
+           << "    interfaces: " << ProbeInterfaces(dev) << "\n";
+    }
+
+    if (!impl_->failures.empty()) {
+        os << "Failures (" << impl_->failures.size() << "):\n";
+        for (const auto& f : impl_->failures) {
+            os << "  " << f.nickname << " [" << f.phase << "]: "
+               << f.error.message();
+            if (!f.detail.empty()) {
+                os << " -- " << f.detail;
+            }
+            os << "\n";
+        }
+    }
+
+    return os.str();
 }
 
 }  // namespace plas::bootstrap

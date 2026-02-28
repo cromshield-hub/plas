@@ -1,0 +1,8 @@
+devices:
+  - nickname: bad_format
+    driver: aardvark
+    uri: "aardvark://no_colon_here"
+
+  - nickname: good_aardvark
+    driver: aardvark
+    uri: "aardvark://0:0x50"
