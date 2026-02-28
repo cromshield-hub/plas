@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <mutex>
+#include <memory>
 #include <string>
 
 #include "plas/hal/interface/device.h"
@@ -9,6 +9,8 @@
 #include "plas/config/device_entry.h"
 
 namespace plas::hal::driver {
+
+struct AardvarkBusState;  // defined in aardvark_device.cpp
 
 class AardvarkDevice : public Device, public I2c {
 public:
@@ -39,6 +41,9 @@ public:
     /// Register this driver with the DeviceFactory.
     static void Register();
 
+    /// Reset the shared bus registry (for test isolation only).
+    static void ResetBusRegistry();
+
 private:
     static bool ParseUri(const std::string& uri, uint16_t& port,
                          uint16_t& addr);
@@ -47,12 +52,11 @@ private:
     std::string uri_;
     DeviceState state_;
     uint32_t bitrate_;
-    int handle_;
     uint16_t port_;
     uint16_t default_addr_;
     bool pullup_enabled_;
     uint16_t bus_timeout_ms_;
-    std::mutex i2c_mutex_;
+    std::shared_ptr<AardvarkBusState> bus_state_;  // valid after Open()
 };
 
 }  // namespace plas::hal::driver

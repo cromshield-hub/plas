@@ -2,7 +2,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 #ifdef PLAS_HAS_AARDVARK
 extern "C" {
@@ -13,6 +15,50 @@ extern "C" {
 #include "plas/core/error.h"
 #include "plas/hal/interface/device_factory.h"
 #include "plas/log/logger.h"
+
+// ---------------------------------------------------------------------------
+// AardvarkBusState — shared SDK handle + bus mutex per port
+// ---------------------------------------------------------------------------
+
+namespace plas::hal::driver {
+
+struct AardvarkBusState {
+    uint16_t   port           = 0;
+    int        handle         = -1;    // aa_open() result; -1 in stub mode
+    std::mutex bus_mutex;              // serializes Read/Write/WriteRead
+    uint32_t   active_bitrate = 0;    // 0 = unset (first Open records it)
+    bool       active_pullup  = true;
+    uint16_t   active_timeout = 200;
+    int        ref_count      = 0;    // Open +1 / Close -1; aa_close at 0
+};
+
+}  // namespace plas::hal::driver
+
+// ---------------------------------------------------------------------------
+// Bus registry: port → weak_ptr<AardvarkBusState>
+//
+// Two mutexes — never held simultaneously:
+//   GetRegistryMutex()      guards map CRUD (Open/Close registry section only)
+//   bus_state_->bus_mutex   guards SDK handle I/O (Read/Write/WriteRead)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+using BusRegistry =
+    std::unordered_map<uint16_t,
+                       std::weak_ptr<plas::hal::driver::AardvarkBusState>>;
+
+BusRegistry& GetBusRegistry() {
+    static BusRegistry registry;
+    return registry;
+}
+
+std::mutex& GetRegistryMutex() {
+    static std::mutex m;
+    return m;
+}
+
+}  // namespace
 
 namespace plas::hal::driver {
 
@@ -91,7 +137,6 @@ AardvarkDevice::AardvarkDevice(const config::DeviceEntry& entry)
       uri_(entry.uri),
       state_(DeviceState::kUninitialized),
       bitrate_(100000),
-      handle_(-1),
       port_(0),
       default_addr_(0),
       pullup_enabled_(true),
@@ -158,34 +203,86 @@ core::Result<void> AardvarkDevice::Open() {
         return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
     }
 
+    {
+        std::lock_guard<std::mutex> reg_lock(GetRegistryMutex());
+
+        auto& registry = GetBusRegistry();
+        auto it = registry.find(port_);
+        if (it != registry.end()) {
+            auto existing = it->second.lock();
+            if (existing) {
+                // Check for config conflicts and warn
+                if (existing->active_bitrate != 0) {
+                    if (bitrate_ != existing->active_bitrate) {
+                        PLAS_LOG_WARN(
+                            "AardvarkDevice::Open() device='" + name_ +
+                            "' bitrate conflict: requested=" +
+                            std::to_string(bitrate_) + " active=" +
+                            std::to_string(existing->active_bitrate));
+                    }
+                    if (pullup_enabled_ != existing->active_pullup) {
+                        PLAS_LOG_WARN(
+                            "AardvarkDevice::Open() device='" + name_ +
+                            "' pullup conflict");
+                    }
+                    if (bus_timeout_ms_ != existing->active_timeout) {
+                        PLAS_LOG_WARN(
+                            "AardvarkDevice::Open() device='" + name_ +
+                            "' bus_timeout_ms conflict: requested=" +
+                            std::to_string(bus_timeout_ms_) + " active=" +
+                            std::to_string(existing->active_timeout));
+                    }
+                }
+                bus_state_ = existing;
+                bus_state_->ref_count++;
+                PLAS_LOG_INFO(
+                    "AardvarkDevice::Open() device='" + name_ +
+                    "' joined shared bus port=" + std::to_string(port_) +
+                    " ref=" + std::to_string(bus_state_->ref_count));
+                state_ = DeviceState::kOpen;
+                return core::Result<void>::Ok();
+            }
+            // weak_ptr expired — remove stale entry
+            registry.erase(it);
+        }
+
+        // No existing bus state — open a new one
+        auto new_state = std::make_shared<AardvarkBusState>();
+        new_state->port = port_;
+
 #ifdef PLAS_HAS_AARDVARK
-    Aardvark handle = aa_open(static_cast<int>(port_));
-    if (handle <= 0) {
-        PLAS_LOG_ERROR("AardvarkDevice::Open() aa_open failed: " +
-                       std::to_string(handle));
-        return core::Result<void>::Err(MapAardvarkError(handle));
-    }
-    handle_ = handle;
+        Aardvark handle = aa_open(static_cast<int>(port_));
+        if (handle <= 0) {
+            PLAS_LOG_ERROR("AardvarkDevice::Open() aa_open failed: " +
+                           std::to_string(handle));
+            return core::Result<void>::Err(MapAardvarkError(handle));
+        }
+        new_state->handle = static_cast<int>(handle);
 
-    // Configure as I2C master
-    aa_configure(handle_, AA_CONFIG_GPIO_I2C);
-
-    // Set bitrate (SDK takes kHz, we store Hz)
-    aa_i2c_bitrate(handle_, static_cast<int>(bitrate_ / 1000));
-
-    // Pull-up resistors
-    aa_i2c_pullup(handle_,
-                  pullup_enabled_ ? AA_I2C_PULLUP_BOTH : AA_I2C_PULLUP_NONE);
-
-    // Bus timeout
-    aa_i2c_bus_timeout(handle_, bus_timeout_ms_);
-
-    PLAS_LOG_INFO("AardvarkDevice::Open() device='" + name_ +
-                  "' handle=" + std::to_string(handle_));
+        // Configure as I2C master
+        aa_configure(handle, AA_CONFIG_GPIO_I2C);
+        aa_i2c_bitrate(handle, static_cast<int>(bitrate_ / 1000));
+        aa_i2c_pullup(handle,
+                      pullup_enabled_ ? AA_I2C_PULLUP_BOTH : AA_I2C_PULLUP_NONE);
+        aa_i2c_bus_timeout(handle, bus_timeout_ms_);
 #else
-    PLAS_LOG_WARN("AardvarkDevice::Open() [stub — SDK not available] device='" +
-                  name_ + "'");
+        PLAS_LOG_WARN(
+            "AardvarkDevice::Open() [stub — SDK not available] device='" +
+            name_ + "'");
 #endif
+
+        new_state->active_bitrate = bitrate_;
+        new_state->active_pullup  = pullup_enabled_;
+        new_state->active_timeout = bus_timeout_ms_;
+        new_state->ref_count      = 1;
+
+        registry[port_] = new_state;  // store weak_ptr
+        bus_state_      = new_state;  // hold strong ref
+
+        PLAS_LOG_INFO("AardvarkDevice::Open() device='" + name_ +
+                      "' opened new bus port=" + std::to_string(port_) +
+                      " handle=" + std::to_string(new_state->handle));
+    }
 
     state_ = DeviceState::kOpen;
     return core::Result<void>::Ok();
@@ -196,16 +293,28 @@ core::Result<void> AardvarkDevice::Close() {
         return core::Result<void>::Err(core::ErrorCode::kAlreadyClosed);
     }
 
-#ifdef PLAS_HAS_AARDVARK
-    if (handle_ >= 0) {
-        aa_close(handle_);
-        PLAS_LOG_INFO("AardvarkDevice::Close() device='" + name_ + "'");
-    }
-#else
-    PLAS_LOG_INFO("AardvarkDevice::Close() [stub] device='" + name_ + "'");
-#endif
+    {
+        std::lock_guard<std::mutex> reg_lock(GetRegistryMutex());
 
-    handle_ = -1;
+        bus_state_->ref_count--;
+        if (bus_state_->ref_count == 0) {
+#ifdef PLAS_HAS_AARDVARK
+            if (bus_state_->handle >= 0) {
+                aa_close(bus_state_->handle);
+            }
+#endif
+            GetBusRegistry().erase(port_);
+            PLAS_LOG_INFO("AardvarkDevice::Close() device='" + name_ +
+                          "' closed bus port=" + std::to_string(port_));
+        } else {
+            PLAS_LOG_INFO(
+                "AardvarkDevice::Close() device='" + name_ +
+                "' released shared ref, remaining=" +
+                std::to_string(bus_state_->ref_count));
+        }
+    }
+
+    bus_state_.reset();
     state_ = DeviceState::kClosed;
     return core::Result<void>::Ok();
 }
@@ -219,7 +328,6 @@ core::Result<void> AardvarkDevice::Reset() {
     }
     // Reset fields so Init can re-parse
     state_ = DeviceState::kUninitialized;
-    handle_ = -1;
     return Init();
 }
 
@@ -253,11 +361,10 @@ core::Result<size_t> AardvarkDevice::Read(core::Address addr,
     }
 
 #ifdef PLAS_HAS_AARDVARK
-    std::lock_guard<std::mutex> lock(i2c_mutex_);
+    std::lock_guard<std::mutex> lock(bus_state_->bus_mutex);
     auto flags = static_cast<uint16_t>(stop ? AA_I2C_NO_FLAGS : AA_I2C_NO_STOP);
-    int result = aa_i2c_read(handle_, static_cast<uint16_t>(addr),
-                             flags, static_cast<uint16_t>(length),
-                             data);
+    int result = aa_i2c_read(bus_state_->handle, static_cast<uint16_t>(addr),
+                             flags, static_cast<uint16_t>(length), data);
     if (result < 0) {
         return core::Result<size_t>::Err(MapAardvarkError(result));
     }
@@ -285,11 +392,10 @@ core::Result<size_t> AardvarkDevice::Write(core::Address addr,
     }
 
 #ifdef PLAS_HAS_AARDVARK
-    std::lock_guard<std::mutex> lock(i2c_mutex_);
+    std::lock_guard<std::mutex> lock(bus_state_->bus_mutex);
     auto flags = static_cast<uint16_t>(stop ? AA_I2C_NO_FLAGS : AA_I2C_NO_STOP);
-    int result = aa_i2c_write(handle_, static_cast<uint16_t>(addr),
-                              flags, static_cast<uint16_t>(length),
-                              data);
+    int result = aa_i2c_write(bus_state_->handle, static_cast<uint16_t>(addr),
+                              flags, static_cast<uint16_t>(length), data);
     if (result < 0) {
         return core::Result<size_t>::Err(MapAardvarkError(result));
     }
@@ -320,8 +426,9 @@ core::Result<size_t> AardvarkDevice::WriteRead(core::Address addr,
     }
 
 #ifdef PLAS_HAS_AARDVARK
-    std::lock_guard<std::mutex> lock(i2c_mutex_);
-    int result = aa_i2c_write_read(handle_, static_cast<uint16_t>(addr),
+    std::lock_guard<std::mutex> lock(bus_state_->bus_mutex);
+    int result = aa_i2c_write_read(bus_state_->handle,
+                                   static_cast<uint16_t>(addr),
                                    AA_I2C_NO_FLAGS,
                                    static_cast<uint16_t>(write_len),
                                    write_data,
@@ -345,15 +452,17 @@ core::Result<void> AardvarkDevice::SetBitrate(uint32_t bitrate) {
     if (bitrate == 0) {
         return core::Result<void>::Err(core::ErrorCode::kInvalidArgument);
     }
-    bitrate_ = bitrate;
+    bitrate_ = bitrate;  // update local cache (GetBitrate() return value)
 
 #ifdef PLAS_HAS_AARDVARK
-    if (state_ == DeviceState::kOpen && handle_ >= 0) {
-        int actual_khz = aa_i2c_bitrate(handle_,
+    if (state_ == DeviceState::kOpen && bus_state_) {
+        std::lock_guard<std::mutex> lock(bus_state_->bus_mutex);
+        int actual_khz = aa_i2c_bitrate(bus_state_->handle,
                                         static_cast<int>(bitrate_ / 1000));
         if (actual_khz < 0) {
             return core::Result<void>::Err(MapAardvarkError(actual_khz));
         }
+        bus_state_->active_bitrate = bitrate_;
         PLAS_LOG_INFO("AardvarkDevice::SetBitrate() actual=" +
                       std::to_string(actual_khz) + " kHz");
     }
@@ -375,6 +484,15 @@ void AardvarkDevice::Register() {
         "aardvark", [](const config::DeviceEntry& entry) {
             return std::make_unique<AardvarkDevice>(entry);
         });
+}
+
+// ---------------------------------------------------------------------------
+// Test support
+// ---------------------------------------------------------------------------
+
+void AardvarkDevice::ResetBusRegistry() {
+    std::lock_guard<std::mutex> lock(GetRegistryMutex());
+    GetBusRegistry().clear();
 }
 
 }  // namespace plas::hal::driver

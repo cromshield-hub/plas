@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include "plas/config/device_entry.h"
 #include "plas/core/error.h"
 #include "plas/hal/driver/aardvark/aardvark_device.h"
@@ -341,6 +346,154 @@ TEST(AardvarkDeviceTest, ResetFromInitialized) {
     auto result = device.Reset();
     ASSERT_TRUE(result.IsOk());
     EXPECT_EQ(device.GetState(), DeviceState::kInitialized);
+}
+
+// ---------------------------------------------------------------------------
+// Shared bus tests
+// ---------------------------------------------------------------------------
+
+class AardvarkSharedBusTest : public ::testing::Test {
+protected:
+    void TearDown() override { AardvarkDevice::ResetBusRegistry(); }
+};
+
+TEST_F(AardvarkSharedBusTest, TwoInstancesSamePortBothOpen) {
+    // Two devices on the same port share the bus state; both Open must succeed.
+    AardvarkDevice dev1(MakeEntry("dev1", "aardvark://0:0x50"));
+    AardvarkDevice dev2(MakeEntry("dev2", "aardvark://0:0x51"));
+    ASSERT_TRUE(dev1.Init().IsOk());
+    ASSERT_TRUE(dev2.Init().IsOk());
+    EXPECT_TRUE(dev1.Open().IsOk());
+    EXPECT_TRUE(dev2.Open().IsOk());
+    EXPECT_EQ(dev1.GetState(), DeviceState::kOpen);
+    EXPECT_EQ(dev2.GetState(), DeviceState::kOpen);
+    dev2.Close();
+    dev1.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, DifferentPortsHaveIndependentBusState) {
+    // Devices on different ports must not share bus state.
+    AardvarkDevice dev1(MakeEntry("dev1", "aardvark://0:0x50"));
+    AardvarkDevice dev2(MakeEntry("dev2", "aardvark://1:0x50"));
+    ASSERT_TRUE(dev1.Init().IsOk());
+    ASSERT_TRUE(dev2.Init().IsOk());
+    ASSERT_TRUE(dev1.Open().IsOk());
+    ASSERT_TRUE(dev2.Open().IsOk());
+    EXPECT_EQ(dev1.GetState(), DeviceState::kOpen);
+    EXPECT_EQ(dev2.GetState(), DeviceState::kOpen);
+    dev1.Close();
+    dev2.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, ReopenAfterLastClose) {
+    // After the last reference on a port closes, a new Open creates a fresh
+    // bus state on the same port.
+    {
+        AardvarkDevice dev1(MakeEntry("dev1", "aardvark://0:0x50"));
+        ASSERT_TRUE(dev1.Init().IsOk());
+        ASSERT_TRUE(dev1.Open().IsOk());
+        ASSERT_TRUE(dev1.Close().IsOk());
+    }
+    AardvarkDevice dev2(MakeEntry("dev2", "aardvark://0:0x51"));
+    ASSERT_TRUE(dev2.Init().IsOk());
+    EXPECT_TRUE(dev2.Open().IsOk());
+    EXPECT_EQ(dev2.GetState(), DeviceState::kOpen);
+    dev2.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, FirstCloseKeepsBusStateAlive) {
+    // Closing one instance must not affect the other still-open instance.
+    AardvarkDevice dev1(MakeEntry("dev1", "aardvark://0:0x50"));
+    AardvarkDevice dev2(MakeEntry("dev2", "aardvark://0:0x51"));
+    ASSERT_TRUE(dev1.Init().IsOk());
+    ASSERT_TRUE(dev2.Init().IsOk());
+    ASSERT_TRUE(dev1.Open().IsOk());
+    ASSERT_TRUE(dev2.Open().IsOk());
+    EXPECT_TRUE(dev1.Close().IsOk());
+    EXPECT_EQ(dev1.GetState(), DeviceState::kClosed);
+    EXPECT_EQ(dev2.GetState(), DeviceState::kOpen);
+    dev2.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, DestructorClosesOpenDevice) {
+    // The destructor must release the shared bus ref so a subsequent Open on
+    // the same port can succeed.
+    {
+        AardvarkDevice dev1(MakeEntry("dev1", "aardvark://0:0x50"));
+        ASSERT_TRUE(dev1.Init().IsOk());
+        ASSERT_TRUE(dev1.Open().IsOk());
+        // dev1 destructs here, calls Close()
+    }
+    AardvarkDevice dev2(MakeEntry("dev2", "aardvark://0:0x51"));
+    ASSERT_TRUE(dev2.Init().IsOk());
+    EXPECT_TRUE(dev2.Open().IsOk());
+    EXPECT_EQ(dev2.GetState(), DeviceState::kOpen);
+    dev2.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, ResetEmptyRegistryIsNoop) {
+    EXPECT_NO_FATAL_FAILURE(AardvarkDevice::ResetBusRegistry());
+}
+
+TEST_F(AardvarkSharedBusTest, SetBitrateUpdatesSharedBus) {
+    // Each instance tracks its own local bitrate_ independently.
+    AardvarkDevice dev1(
+        MakeEntry("dev1", "aardvark://0:0x50", {{"bitrate", "100000"}}));
+    AardvarkDevice dev2(
+        MakeEntry("dev2", "aardvark://0:0x51", {{"bitrate", "400000"}}));
+    ASSERT_TRUE(dev1.Init().IsOk());
+    ASSERT_TRUE(dev2.Init().IsOk());
+    ASSERT_TRUE(dev1.Open().IsOk());
+    ASSERT_TRUE(dev2.Open().IsOk());
+
+    EXPECT_EQ(dev1.GetBitrate(), 100000u);
+    EXPECT_EQ(dev2.GetBitrate(), 400000u);
+
+    ASSERT_TRUE(dev1.SetBitrate(200000).IsOk());
+    EXPECT_EQ(dev1.GetBitrate(), 200000u);
+    EXPECT_EQ(dev2.GetBitrate(), 400000u);  // unchanged
+
+    dev1.Close();
+    dev2.Close();
+}
+
+TEST_F(AardvarkSharedBusTest, ConcurrentOpenSamePort) {
+    // 8 threads simultaneously Opening devices on port 0 must not corrupt the
+    // registry (no crash, all succeed via shared bus state).
+    const int kThreads = 8;
+    std::vector<std::unique_ptr<AardvarkDevice>> devices;
+    devices.reserve(static_cast<size_t>(kThreads));
+    for (int i = 0; i < kThreads; ++i) {
+        std::string nickname = "dev" + std::to_string(i);
+        // Decimal addresses 80-87 are valid 7-bit I2C addresses (<=127).
+        std::string uri =
+            "aardvark://0:" + std::to_string(static_cast<int>(0x50) + i);
+        devices.push_back(
+            std::make_unique<AardvarkDevice>(MakeEntry(nickname, uri)));
+        ASSERT_TRUE(devices.back()->Init().IsOk());
+    }
+
+    std::vector<std::thread> threads;
+    std::atomic<int> success_count{0};
+    threads.reserve(static_cast<size_t>(kThreads));
+    for (int i = 0; i < kThreads; ++i) {
+        threads.emplace_back([&devices, &success_count, i]() {
+            if (devices[static_cast<size_t>(i)]->Open().IsOk()) {
+                ++success_count;
+            }
+        });
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    EXPECT_EQ(success_count.load(), kThreads);
+
+    for (auto& dev : devices) {
+        if (dev->GetState() == DeviceState::kOpen) {
+            dev->Close();
+        }
+    }
 }
 
 }  // namespace

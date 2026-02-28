@@ -8,6 +8,7 @@
 ///  4. Cast to interface types (dynamic_cast via GetInterface)
 ///  5. Device lifecycle (Init -> Open -> Close)
 ///  6. Load from ConfigNode tree
+///  7. Shared bus: two devices on the same Aardvark port share one handle
 
 #include <cstdio>
 #include <string>
@@ -112,6 +113,42 @@ int main() {
         return 1;
     }
     std::printf("    Loaded %zu device(s) from tree\n", dm.DeviceCount());
+
+    // --- 7. Shared bus: two devices on the same Aardvark port ---
+    //
+    // aardvark0 (port 0, addr 0x50) and aardvark1 (port 0, addr 0x68) both
+    // target port 0. Under the old design, the second aa_open() would fail.
+    // With shared-handle support, both Open() calls succeed — they share one
+    // SDK handle and one bus-level mutex for I/O serialization.
+    std::printf("\n[*] Shared bus — two devices on Aardvark port 0:\n");
+    {
+        auto* dev0 = dm.GetDevice("aardvark0");
+        auto* dev1 = dm.GetDevice("aardvark1");
+
+        if (!dev0 || !dev1) {
+            std::printf("    Skipped — aardvark0 or aardvark1 not loaded\n");
+        } else {
+            dev0->Init();
+            dev1->Init();
+
+            auto open0 = dev0->Open();
+            auto open1 = dev1->Open();  // joins shared bus, no aa_open called
+            std::printf("    aardvark0 Open: %s\n",
+                        open0.IsOk() ? "ok" : open0.Error().message().c_str());
+            std::printf("    aardvark1 Open: %s  (shared port 0 handle)\n",
+                        open1.IsOk() ? "ok" : open1.Error().message().c_str());
+
+            // Close the first — the second must still be kOpen
+            dev0->Close();
+            std::printf("    aardvark0 closed. aardvark1 state: %s\n",
+                        dev1->GetState() == DeviceState::kOpen
+                            ? "still open (shared ref count > 0)"
+                            : "unexpectedly closed");
+
+            dev1->Close();
+            std::printf("    aardvark1 closed. Port 0 handle released.\n");
+        }
+    }
 
     // --- Cleanup ---
     dm.Reset();

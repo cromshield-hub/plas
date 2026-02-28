@@ -110,10 +110,10 @@ plas/
 | `config/` | `config_load` | `plas::config` | Flat JSON, grouped YAML, LoadFromNode, FindDevice |
 | `config/` | `config_node_tree` | `plas::config` | Subtree navigation, type queries, chaining |
 | `config/` | `property_manager` | `plas::config` | Single/multi-session load, runtime update |
-| `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle |
+| `hal/` | `device_manager` | `plas::hal_interface`, `plas::hal_driver` | Driver registration, interface casting, lifecycle, shared bus demo |
 | `pci/` | `doe_exchange` | `plas::hal_interface` | PCI DOE discovery + data exchange (stub device) |
 | `pci/` | `topology_walk` | `plas::hal_interface` | sysfs PCI topology traversal (real hardware) |
-| `master/` | `master_example` | `plas::bootstrap` | End-to-end Bootstrap: config→devices→I2C+PCI I/O |
+| `master/` | `master_example` | `plas::bootstrap` | End-to-end Bootstrap: config→devices→I2C+PCI I/O, shared bus demo |
 
 ## Bootstrap (`plas::bootstrap`)
 - **Class**: `Bootstrap` — single-call application initialization (replaces manual driver registration + config parsing + device lifecycle boilerplate)
@@ -216,11 +216,14 @@ plas/
 - **Build flag**: `PLAS_WITH_AARDVARK=ON` (default), auto-detected via `FindAardvark.cmake`
 - **Compile define**: `PLAS_HAS_AARDVARK=1` when enabled
 - **Config args**: `bitrate` (Hz, default 100000), `pullup` (true/false, default true), `bus_timeout_ms` (default 200)
-- **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open (aa_open + configure) → kOpen → Close (aa_close) → kClosed
-- **I2C ops**: `aa_i2c_read`, `aa_i2c_write`, `aa_i2c_write_read` — mutex-serialized, length ≤ 0xFFFF; `stop=false` passes `AA_I2C_NO_STOP` flag (Repeated START support)
+- **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open → kOpen → Close → kClosed
+- **Shared bus handle**: Multiple `AardvarkDevice` instances targeting the **same port** share one `AardvarkBusState` (SDK handle + bus mutex + ref_count) via a static `weak_ptr` registry. The first Open calls `aa_open`; subsequent Opens on that port join the shared state without calling `aa_open` again. Close decrements ref_count; `aa_close` is called only when ref_count reaches 0. Each instance still keeps its own `bitrate_` local cache for `GetBitrate()`, but warns in the log if instances on the same port request conflicting settings.
+- **Two-mutex design**: `GetRegistryMutex()` guards the map CRUD; `bus_state_->bus_mutex` guards SDK I/O. The two are never held simultaneously.
+- **I2C ops**: `aa_i2c_read`, `aa_i2c_write`, `aa_i2c_write_read` — bus_mutex-serialized, length ≤ 0xFFFF; `stop=false` passes `AA_I2C_NO_STOP` flag (Repeated START support)
 - **Error mapping**: SDK error codes → `core::ErrorCode` (kIOError, kTimeout, kNotSupported, kDataLoss)
-- **Unit tests**: 35 tests in `test_aardvark_device.cpp` (always built, no SDK required)
+- **Unit tests**: 43 tests in `test_aardvark_device.cpp` (always built, no SDK required); includes 8 `AardvarkSharedBusTest` tests
 - **Integration tests**: Gated by `PLAS_TEST_AARDVARK_PORT` env var (e.g., `0:0x50`)
+- **Test helper**: `AardvarkDevice::ResetBusRegistry()` — clears the static registry for test isolation (call in TearDown)
 
 ## FT4222H Driver (optional, requires FT4222H + D2XX SDK)
 - **Class**: `Ft4222hDevice` — implements `Device`, `I2c`

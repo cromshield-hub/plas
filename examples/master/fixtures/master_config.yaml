@@ -13,6 +13,12 @@ plas:
         pullup: true
         bus_timeout_ms: 200
 
+      - nickname: rtc_reader
+        uri: "aardvark://0:0x68"
+        bitrate: 400000
+        pullup: true
+        bus_timeout_ms: 200
+
       - nickname: sensor_bus
         uri: "aardvark://1:0x48"
         bitrate: 100000

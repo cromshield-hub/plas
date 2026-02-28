@@ -10,11 +10,12 @@
 ///  4. GetDeviceByUri() — look up a device by its URI
 ///  5. DeviceFailure::detail — rich error reporting on failures
 ///  6. I2C read on the first Aardvark
-///  7. PCI config register reads (Vendor/Device ID, Class Code, capabilities)
-///  8. PCI BAR0 register reads (NVMe Controller Registers)
-///  9. PCI topology walk for the NVMe device
-/// 10. Bootstrap::Init() with in-memory ConfigNode (no file I/O)
-/// 11. Bootstrap::Deinit() — close all, cleanup
+///  7. Shared bus: eeprom_reader + rtc_reader share port 0 handle
+///  8. PCI config register reads (Vendor/Device ID, Class Code, capabilities)
+///  9. PCI BAR0 register reads (NVMe Controller Registers)
+/// 10. PCI topology walk for the NVMe device
+/// 11. Bootstrap::Init() with in-memory ConfigNode (no file I/O)
+/// 12. Bootstrap::Deinit() — close all, cleanup
 ///
 /// Usage:
 ///   ./master_example                          -- run with default config
@@ -179,9 +180,33 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 7. PCI config register reads on the NVMe device
+    // 7. Shared bus: eeprom_reader + rtc_reader on port 0
+    //
+    // Both devices target aardvark port 0. Bootstrap::Init() opened them via
+    // a single aa_open() call; subsequent opens joined the shared bus handle.
+    // Closing one while the other is open does NOT call aa_close().
     // -----------------------------------------------------------------------
-    std::printf("\n[7] PCI config read (nvme0):\n");
+    std::printf("\n[7] Shared bus demo (port 0: eeprom_reader + rtc_reader):\n");
+    {
+        auto* eeprom = bs.GetDevice("eeprom_reader");
+        auto* rtc    = bs.GetDevice("rtc_reader");
+        if (!eeprom || !rtc) {
+            std::printf("    Skipped — one of the port-0 devices not loaded\n");
+        } else {
+            std::printf("    eeprom_reader state: %s\n",
+                        eeprom->GetState() == DeviceState::kOpen
+                            ? "open" : "not open");
+            std::printf("    rtc_reader    state: %s\n",
+                        rtc->GetState() == DeviceState::kOpen
+                            ? "open" : "not open");
+            std::printf("    (both share port 0 handle — one aa_open call)\n");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 8. PCI config register reads on the NVMe device
+    // -----------------------------------------------------------------------
+    std::printf("\n[8] PCI config read (nvme0):\n");
     auto* pcicfg = bs.GetInterface<PciConfig>("nvme0");
     if (!pcicfg) {
         std::printf("    Skipped -- PciConfig interface not available\n");
@@ -228,9 +253,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 8. PCI BAR0 register reads (NVMe Controller Registers)
+    // 9. PCI BAR0 register reads (NVMe Controller Registers)
     // -----------------------------------------------------------------------
-    std::printf("\n[8] PCI BAR0 read (nvme0):\n");
+    std::printf("\n[9] PCI BAR0 read (nvme0):\n");
     auto* pcibar = bs.GetInterface<PciBar>("nvme0");
     if (!pcibar) {
         std::printf("    Skipped -- PciBar interface not available\n");
@@ -269,9 +294,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 9. PCI topology walk for the NVMe device
+    // 10. PCI topology walk for the NVMe device
     // -----------------------------------------------------------------------
-    std::printf("\n[9] PCI topology walk (nvme0):\n");
+    std::printf("\n[10] PCI topology walk (nvme0):\n");
     {
         auto* nvme_dev = bs.GetDevice("nvme0");
         if (!nvme_dev) {
@@ -302,9 +327,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 10. Bootstrap::Init with in-memory ConfigNode (no file I/O)
+    // 11. Bootstrap::Init with in-memory ConfigNode (no file I/O)
     // -----------------------------------------------------------------------
-    std::printf("\n[10] In-memory ConfigNode init:\n");
+    std::printf("\n[11] In-memory ConfigNode init:\n");
     {
         // Tear down current bootstrap first
         bs.Deinit();
@@ -327,8 +352,8 @@ int main(int argc, char* argv[]) {
 
                 auto mem_result = bs.Init(mem_cfg);
                 if (mem_result.IsOk()) {
-                    std::printf("    Success: %zu devices via ConfigNode "
-                                "(no temp files!)\n",
+                    std::printf("    Success: %zu device(s) via ConfigNode "
+                                "(no temp files)\n",
                                 mem_result.Value().devices_opened);
                 } else {
                     std::printf("    Init failed: %s\n",
@@ -339,9 +364,9 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 11. Cleanup — let Bootstrap handle it
+    // 12. Cleanup — let Bootstrap handle it
     // -----------------------------------------------------------------------
-    std::printf("\n[11] Shutting down...\n");
+    std::printf("\n[12] Shutting down...\n");
     bs.Deinit();
 
     std::printf("\n=== Done ===\n");
