@@ -70,17 +70,22 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | 카테고리 | 테스트 수 | 상태 |
 |----------|----------|------|
 | Core (error, result, units) | 25 | **Pass** |
+| Core (byte_buffer) | 17 | **Pass** |
+| Core (version) | 8 | **Pass** |
 | Core (properties) | 44 | **Pass** |
 | Log | 4 | **Pass** |
 | Config (JSON, YAML) | 19 | **Pass** |
 | Config (ConfigNode) | 11 | **Pass** |
 | Config (PropertyManager) | 31 | **Pass** |
+| Config (errors) | 21 | **Pass** |
 | HAL (device_factory) | 7 | **Pass** |
 | HAL (device_manager) | 24 | **Pass** |
+| HAL (device_lifecycle) | 16 | **Pass** |
 | PCI (types, config, doe) | 35 | **Pass** |
 | PCI (topology) | 22 | **Pass** |
 | PCI (topology integration) | 6 | **Skip** (env-gated) |
-| **합계** | **236** | **All Pass** (230 run + 6 skipped) |
+| CXL (types, cxl, mailbox) | 40 | **Pass** |
+| **합계** | **336** | **All Pass** (330 run + 6 skipped) |
 
 ---
 
@@ -115,10 +120,13 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
   - sysfs symlink → realpath 파싱으로 토폴로지 추출, config binary에서 PCIe cap 읽기
   - `SetSysfsRoot()` 로 fake sysfs 기반 unit test 22개 + integration test 6개 (env-gated)
   - `topology_walk` 예제 추가
-- [ ] `interface/pci/cxl.h` — CXL 인터페이스 ABC (CXL IDE-KM, CXL.mem 등)
-  - PciDoe를 composition으로 사용, DVSEC 기반 식별
-- [ ] `interface/pci/mctp.h` — MCTP over PCIe VDM 인터페이스 ABC
+- [x] `interface/pci/cxl_types.h`, `cxl.h`, `cxl_mailbox.h` — CXL 인터페이스 ABC (2026-02-28)
+  - CXL DVSEC types/enums, Cxl ABC (6 methods), CxlMailbox ABC (5 methods)
+  - IDE-KM types (타입만, ABC 없음), 40 tests (types 13 + cxl 15 + mailbox 12)
+  - 추후 use case 확보 시 driver 구현체 마무리
 - [ ] PCI 드라이버 구현체 (대상 하드웨어 미정)
+
+> **Note**: MCTP over PCIe VDM (`mctp.h`) — sideband transport 결정 보류. CXL 2.0은 DOE/mailbox 기반, MCTP는 별도 sideband (SMBus/I3C/PCIe VDM) 선택 후 진행.
 
 ### P1 — Examples
 
@@ -137,10 +145,10 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 
 ### P2 — 테스트 보강
 
-- [ ] ByteBuffer 단위 테스트
-- [ ] Version 단위 테스트
-- [ ] Device lifecycle 에러 케이스 (이중 Open, 미초기화 Open 등)
-- [ ] Config 에러 케이스 (malformed JSON/YAML)
+- [x] ByteBuffer 단위 테스트 (2026-02-28) — 17 tests
+- [x] Version 단위 테스트 (2026-02-28) — 8 tests
+- [x] Device lifecycle 에러 케이스 (2026-02-28) — 16 tests (이중 Open, 미초기화 Open, 이중 Close, Reset, 풀사이클 등)
+- [x] Config 에러 케이스 (2026-02-28) — 21 tests (malformed JSON/YAML, missing fields, key path errors)
 
 ### P3 — 아이디어
 

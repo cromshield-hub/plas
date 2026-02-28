@@ -17,6 +17,14 @@ add_executable(test_core_properties core/test_properties.cpp)
 target_link_libraries(test_core_properties PRIVATE plas::core GTest::gtest_main)
 gtest_discover_tests(test_core_properties)
 
+add_executable(test_core_byte_buffer core/test_byte_buffer.cpp)
+target_link_libraries(test_core_byte_buffer PRIVATE plas::core GTest::gtest_main)
+gtest_discover_tests(test_core_byte_buffer)
+
+add_executable(test_core_version core/test_version.cpp)
+target_link_libraries(test_core_version PRIVATE plas::core GTest::gtest_main)
+gtest_discover_tests(test_core_version)
+
 # Log tests
 add_executable(test_logger log/test_logger.cpp)
 target_link_libraries(test_logger PRIVATE plas::log GTest::gtest_main)
@@ -39,6 +47,10 @@ add_executable(test_config_node config/test_config_node.cpp)
 target_link_libraries(test_config_node PRIVATE plas::config GTest::gtest_main)
 gtest_discover_tests(test_config_node)
 
+add_executable(test_config_errors config/test_config_errors.cpp)
+target_link_libraries(test_config_errors PRIVATE plas::config GTest::gtest_main)
+gtest_discover_tests(test_config_errors)
+
 # Copy test fixtures to build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/config/fixtures/
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)
@@ -55,6 +67,13 @@ add_executable(test_device_factory hal/interface/test_device_factory.cpp)
 target_link_libraries(test_device_factory
     PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
 gtest_discover_tests(test_device_factory)
+
+add_executable(test_device_lifecycle hal/interface/test_device_lifecycle.cpp)
+target_link_libraries(test_device_lifecycle
+    PRIVATE plas::hal_interface GTest::gtest_main)
+target_include_directories(test_device_lifecycle
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/hal/interface)
+gtest_discover_tests(test_device_lifecycle)
 
 # PCI interface tests
 add_executable(test_pci_types hal/interface/pci/test_pci_types.cpp)
@@ -82,6 +101,22 @@ add_executable(test_pci_topology_integration
 target_link_libraries(test_pci_topology_integration
     PRIVATE plas::hal_interface GTest::gtest_main)
 gtest_discover_tests(test_pci_topology_integration)
+
+# CXL interface tests
+add_executable(test_cxl_types hal/interface/pci/test_cxl_types.cpp)
+target_link_libraries(test_cxl_types
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_cxl_types)
+
+add_executable(test_cxl hal/interface/pci/test_cxl.cpp)
+target_link_libraries(test_cxl
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_cxl)
+
+add_executable(test_cxl_mailbox hal/interface/pci/test_cxl_mailbox.cpp)
+target_link_libraries(test_cxl_mailbox
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_cxl_mailbox)
 
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)

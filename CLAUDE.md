@@ -1,7 +1,7 @@
 # PLAS — Platform Library Across Systems
 
 ## Project Overview
-C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO, PCI Config/DOE) with driver implementations for Aardvark, FT4222H, PMU3, PMU4, and PciUtils devices.
+C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO, PCI Config/DOE, CXL DVSEC/Mailbox) with driver implementations for Aardvark, FT4222H, PMU3, PMU4, and PciUtils devices.
 
 ## Build
 ```bash
@@ -22,7 +22,7 @@ cd build && ctest --output-on-failure
 - `plas::log` — logger (spdlog backend, compile-time selection)
 - `plas::config` — JSON/YAML config parsing, PropertyManager (config→Properties session mapping)
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
-- `plas::hal::pci` — PCI domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciTopology)
+- `plas::hal::pci` — PCI/CXL domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciTopology, Cxl, CxlMailbox)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
 
 ## CMake Targets
@@ -121,6 +121,23 @@ plas/
 - **Config args**: `doe_timeout_ms` (default 1000), `doe_poll_interval_us` (default 100)
 - **DOE**: Full mailbox handshake (Write→GO→Poll Ready→Read) with abort/error recovery
 - **Integration tests**: Gated by `PLAS_TEST_PCIUTILS_BDF` env var (e.g., `0000:03:00.0`)
+
+## CXL Interface (header-only ABCs)
+- **Headers**: `components/plas-core/include/plas/hal/interface/pci/cxl_types.h`, `cxl.h`, `cxl_mailbox.h`
+- **Target**: `plas_hal_interface` (header-only, no new source files)
+- **Types** (`cxl_types.h`):
+  - `cxl::kCxlVendorId = 0x1E98`
+  - `CxlDvsecId` enum — CXL DVSEC IDs (kCxlDevice, kRegisterLocator, kFlexBusPort, etc.)
+  - `CxlDeviceType` enum — kType1, kType2, kType3, kUnknown
+  - `DvsecHeader` struct — offset, vendor_id, dvsec_revision, dvsec_id, dvsec_length
+  - `CxlRegisterBlockId` enum, `RegisterBlockEntry` struct — Register Locator DVSEC entries
+  - `CxlMailboxOpcode` enum — Identify, GetHealthInfo, Sanitize, FW ops, etc.
+  - `CxlMailboxReturnCode` enum — Success, InvalidInput, Unsupported, etc.
+  - `CxlMailboxPayload` (`vector<uint8_t>`), `CxlMailboxResult` struct
+  - IDE-KM types: `doe_type::kIdeKm`, `IdeKmMessageType` enum, `IdeStreamId` struct
+- **Cxl ABC** (`cxl.h`): EnumerateCxlDvsecs, FindCxlDvsec, GetCxlDeviceType, GetRegisterBlocks, ReadDvsecRegister, WriteDvsecRegister
+- **CxlMailbox ABC** (`cxl_mailbox.h`): ExecuteCommand (typed + raw opcode), GetPayloadSize, IsReady, GetBackgroundCmdStatus
+- **Tests**: `test_cxl_types.cpp` (12), `test_cxl.cpp` (15), `test_cxl_mailbox.cpp` (12) — mock device pattern
 
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
