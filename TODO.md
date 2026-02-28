@@ -79,24 +79,24 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | Core (properties) | 44 | **Pass** |
 | Log | 4 | **Pass** |
 | Config (JSON, YAML) | 19 | **Pass** |
-| Config (ConfigNode) | 11 | **Pass** |
+| Config (ConfigNode) | 12 | **Pass** |
 | Config (PropertyManager) | 31 | **Pass** |
 | Config (errors) | 21 | **Pass** |
-| HAL (device_factory) | 7 | **Pass** |
+| HAL (device_factory) | 11 | **Pass** |
 | HAL (device_manager) | 24 | **Pass** |
-| HAL (device_lifecycle) | 16 | **Pass** |
-| PCI (types, config, doe) | 35 | **Pass** |
-| PCI (topology) | 22 | **Pass** |
+| HAL (device_lifecycle) | 14 | **Pass** |
+| PCI (types, config, doe) | 47 | **Pass** |
+| PCI (topology) | 17 | **Pass** |
 | PCI (topology integration) | 6 | **Skip** (env-gated) |
 | CXL (types, cxl, mailbox) | 40 | **Pass** |
-| HAL (aardvark unit) | 33 | **Pass** |
-| HAL (aardvark integration) | 6 | **Skip** (env-gated, `PLAS_TEST_AARDVARK_PORT`) |
-| HAL (ft4222h unit) | 33 | **Pass** |
-| HAL (ft4222h integration) | 7 | **Skip** (env-gated, `PLAS_TEST_FT4222H_PORT`) |
-| HAL (pciutils unit) | 14 | **Skip** (libpci 필요) |
+| HAL (aardvark unit) | 31 | **Pass** |
+| HAL (aardvark integration) | — | **Skip** (env-gated, `PLAS_TEST_AARDVARK_PORT`) |
+| HAL (ft4222h unit) | 31 | **Pass** |
+| HAL (ft4222h integration) | — | **Skip** (env-gated, `PLAS_TEST_FT4222H_PORT`) |
+| HAL (pciutils unit) | — | **Skip** (libpci 필요) |
 | HAL (pciutils integration) | — | **Skip** (env-gated, `PLAS_TEST_PCIUTILS_BDF`) |
 | Bootstrap | 40 | **Pass** |
-| **합계** | **442** | **All Pass** (436 run + 6 skipped) |
+| **합계** | **442** | **All Pass** (442 run, integration skipped) |
 
 ---
 
