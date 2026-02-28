@@ -66,7 +66,7 @@ TEST_F(BootstrapTest, DestructorCallsDeinit) {
     {
         Bootstrap bs;
         BootstrapConfig cfg;
-        cfg.device_config_path = FixturePath("basic_config.yaml");
+        cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
         auto result = bs.Init(cfg);
         ASSERT_TRUE(result.IsOk()) << result.Error().message();
         EXPECT_GT(DeviceManager::GetInstance().DeviceCount(), 0u);
@@ -78,7 +78,7 @@ TEST_F(BootstrapTest, DestructorCallsDeinit) {
 TEST_F(BootstrapTest, DoubleInitFails) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
 
     auto r1 = bs.Init(cfg);
     ASSERT_TRUE(r1.IsOk()) << r1.Error().message();
@@ -108,7 +108,7 @@ TEST_F(BootstrapTest, RegisterAllDriversIdempotent) {
 TEST_F(BootstrapTest, InitMinimalConfig) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
 
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk()) << result.Error().message();
@@ -121,7 +121,7 @@ TEST_F(BootstrapTest, InitMinimalConfig) {
 TEST_F(BootstrapTest, InitWithKeyPath) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("grouped_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_grouped_config.yaml");
     cfg.device_config_key_path = "plas.devices";
 
     auto result = bs.Init(cfg);
@@ -132,8 +132,8 @@ TEST_F(BootstrapTest, InitWithKeyPath) {
 TEST_F(BootstrapTest, InitWithProperties) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
-    cfg.properties_config_path = FixturePath("properties_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    cfg.properties_config_path = FixturePath("bootstrap_properties_config.yaml");
 
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk()) << result.Error().message();
@@ -147,7 +147,7 @@ TEST_F(BootstrapTest, InitWithProperties) {
 TEST_F(BootstrapTest, InitAutoOpenFalse) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     cfg.auto_open_devices = false;
 
     auto result = bs.Init(cfg);
@@ -163,7 +163,7 @@ TEST_F(BootstrapTest, InitAutoOpenFalse) {
 TEST_F(BootstrapTest, InitAutoOpenTrue) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     cfg.auto_open_devices = true;
 
     auto result = bs.Init(cfg);
@@ -177,7 +177,7 @@ TEST_F(BootstrapTest, InitAutoOpenTrue) {
 TEST_F(BootstrapTest, InitDevicesAreOpenedAfterInit) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
 
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
@@ -192,7 +192,7 @@ TEST_F(BootstrapTest, InitDevicesAreOpenedAfterInit) {
 TEST_F(BootstrapTest, InitWithLogConfig) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     cfg.log_config = plas::log::LogConfig{};
     cfg.log_config->level = plas::log::LogLevel::kDebug;
     cfg.log_config->console_enabled = false;
@@ -208,7 +208,7 @@ TEST_F(BootstrapTest, InitWithLogConfig) {
 TEST_F(BootstrapTest, SkipUnknownDrivers) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("unknown_driver_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
     cfg.skip_unknown_drivers = true;
 
     auto result = bs.Init(cfg);
@@ -224,7 +224,7 @@ TEST_F(BootstrapTest, SkipUnknownDrivers) {
 TEST_F(BootstrapTest, StrictModeUnknownDriverFails) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("unknown_driver_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
     cfg.skip_unknown_drivers = false;
     cfg.skip_device_failures = false;
 
@@ -237,7 +237,7 @@ TEST_F(BootstrapTest, StrictModeUnknownDriverFails) {
 TEST_F(BootstrapTest, SkipDeviceFailureOnCreate) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("unknown_driver_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
     cfg.skip_unknown_drivers = false;  // treat unknown as device failure
     cfg.skip_device_failures = true;
 
@@ -250,7 +250,7 @@ TEST_F(BootstrapTest, SkipDeviceFailureOnCreate) {
 TEST_F(BootstrapTest, SkipDeviceFailureOnInit) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("invalid_uri_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_invalid_uri_config.yaml");
     cfg.skip_device_failures = true;
 
     auto result = bs.Init(cfg);
@@ -265,7 +265,7 @@ TEST_F(BootstrapTest, SkipDeviceFailureOnInit) {
 TEST_F(BootstrapTest, StrictModeDeviceFailureOnInit) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("invalid_uri_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_invalid_uri_config.yaml");
     cfg.skip_device_failures = false;
 
     auto result = bs.Init(cfg);
@@ -299,7 +299,7 @@ TEST_F(BootstrapTest, InitFileNotFoundFails) {
 TEST_F(BootstrapTest, InitMalformedConfigFails) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("malformed.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_malformed.yaml");
 
     auto result = bs.Init(cfg);
     EXPECT_TRUE(result.IsError());
@@ -308,7 +308,7 @@ TEST_F(BootstrapTest, InitMalformedConfigFails) {
 TEST_F(BootstrapTest, InitBadPropertiesPathRollsBack) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     cfg.properties_config_path = "nonexistent_properties.yaml";
 
     auto result = bs.Init(cfg);
@@ -319,8 +319,8 @@ TEST_F(BootstrapTest, InitBadPropertiesPathRollsBack) {
 TEST_F(BootstrapTest, ConfigParseFailureRollsBackProperties) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("malformed.yaml");
-    cfg.properties_config_path = FixturePath("properties_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_malformed.yaml");
+    cfg.properties_config_path = FixturePath("bootstrap_properties_config.yaml");
 
     auto result = bs.Init(cfg);
     EXPECT_TRUE(result.IsError());
@@ -333,7 +333,7 @@ TEST_F(BootstrapTest, ConfigParseFailureRollsBackProperties) {
 TEST_F(BootstrapTest, StrictModeRollsBackDevices) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("unknown_driver_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
     cfg.skip_unknown_drivers = false;
     cfg.skip_device_failures = false;
 
@@ -363,7 +363,7 @@ TEST_F(BootstrapTest, GetPropertyManager) {
 TEST_F(BootstrapTest, GetDeviceAfterInit) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -381,7 +381,7 @@ TEST_F(BootstrapTest, GetDeviceNotFound) {
 TEST_F(BootstrapTest, GetInterfaceI2c) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -392,7 +392,7 @@ TEST_F(BootstrapTest, GetInterfaceI2c) {
 TEST_F(BootstrapTest, GetInterfaceUnsupported) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -409,7 +409,7 @@ TEST_F(BootstrapTest, GetInterfaceNonexistentDevice) {
 TEST_F(BootstrapTest, DeviceNames) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -423,7 +423,7 @@ TEST_F(BootstrapTest, DeviceNames) {
 TEST_F(BootstrapTest, GetFailuresEmpty) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -433,7 +433,7 @@ TEST_F(BootstrapTest, GetFailuresEmpty) {
 TEST_F(BootstrapTest, GetFailuresWithSkipped) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("unknown_driver_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_unknown_driver_config.yaml");
     cfg.skip_unknown_drivers = true;
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
@@ -451,7 +451,7 @@ TEST_F(BootstrapTest, GetFailuresWithSkipped) {
 TEST_F(BootstrapTest, DeinitClearsDevices) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
     EXPECT_GT(DeviceManager::GetInstance().DeviceCount(), 0u);
@@ -464,7 +464,7 @@ TEST_F(BootstrapTest, DeinitClearsDevices) {
 TEST_F(BootstrapTest, DeinitIdempotent) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
 
@@ -482,8 +482,8 @@ TEST_F(BootstrapTest, DeinitWithoutInitIsNoop) {
 TEST_F(BootstrapTest, DeinitCleansUpProperties) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
-    cfg.properties_config_path = FixturePath("properties_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
+    cfg.properties_config_path = FixturePath("bootstrap_properties_config.yaml");
 
     auto result = bs.Init(cfg);
     ASSERT_TRUE(result.IsOk());
@@ -498,7 +498,7 @@ TEST_F(BootstrapTest, DeinitCleansUpProperties) {
 TEST_F(BootstrapTest, CanReinitAfterDeinit) {
     Bootstrap bs;
     BootstrapConfig cfg;
-    cfg.device_config_path = FixturePath("basic_config.yaml");
+    cfg.device_config_path = FixturePath("bootstrap_basic_config.yaml");
 
     auto r1 = bs.Init(cfg);
     ASSERT_TRUE(r1.IsOk());
