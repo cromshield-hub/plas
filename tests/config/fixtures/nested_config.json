@@ -1,0 +1,27 @@
+{
+    "plas": {
+        "devices": {
+            "aardvark": [
+                {
+                    "nickname": "aardvark0",
+                    "uri": "aardvark://0:0x50",
+                    "bitrate": 400000
+                }
+            ],
+            "pmu3": [
+                {
+                    "nickname": "pmu3_main",
+                    "uri": "pmu3://usb:PMU3-001"
+                }
+            ]
+        }
+    },
+    "libnvme": {
+        "buses": [
+            {
+                "type": "pcie",
+                "bdf": "01:00.0"
+            }
+        ]
+    }
+}

@@ -35,6 +35,10 @@ add_executable(test_property_manager config/test_property_manager.cpp)
 target_link_libraries(test_property_manager PRIVATE plas::config GTest::gtest_main)
 gtest_discover_tests(test_property_manager)
 
+add_executable(test_config_node config/test_config_node.cpp)
+target_link_libraries(test_config_node PRIVATE plas::config GTest::gtest_main)
+gtest_discover_tests(test_config_node)
+
 # Copy test fixtures to build dir
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/config/fixtures/
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)

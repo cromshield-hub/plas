@@ -19,6 +19,26 @@ core::Result<void> DeviceManager::LoadFromConfig(
     return LoadFromEntries(config_result.Value().GetDevices());
 }
 
+core::Result<void> DeviceManager::LoadFromConfig(
+    const std::string& path, const std::string& key_path,
+    config::ConfigFormat fmt) {
+    auto config_result = config::Config::LoadFromFile(path, key_path, fmt);
+    if (config_result.IsError()) {
+        return core::Result<void>::Err(config_result.Error());
+    }
+
+    return LoadFromEntries(config_result.Value().GetDevices());
+}
+
+core::Result<void> DeviceManager::LoadFromTree(const config::ConfigNode& node) {
+    auto config_result = config::Config::LoadFromNode(node);
+    if (config_result.IsError()) {
+        return core::Result<void>::Err(config_result.Error());
+    }
+
+    return LoadFromEntries(config_result.Value().GetDevices());
+}
+
 core::Result<void> DeviceManager::LoadFromEntries(
     const std::vector<config::DeviceEntry>& entries) {
     std::lock_guard<std::mutex> lock(mutex_);

@@ -8,6 +8,7 @@
 
 #include "plas/config/config.h"
 #include "plas/config/config_format.h"
+#include "plas/config/config_node.h"
 #include "plas/config/device_entry.h"
 #include "plas/core/result.h"
 #include "plas/hal/interface/device.h"
@@ -22,6 +23,13 @@ public:
     core::Result<void> LoadFromConfig(
         const std::string& path,
         config::ConfigFormat fmt = config::ConfigFormat::kAuto);
+
+    core::Result<void> LoadFromConfig(
+        const std::string& path,
+        const std::string& key_path,
+        config::ConfigFormat fmt = config::ConfigFormat::kAuto);
+
+    core::Result<void> LoadFromTree(const config::ConfigNode& node);
 
     core::Result<void> LoadFromEntries(
         const std::vector<config::DeviceEntry>& entries);

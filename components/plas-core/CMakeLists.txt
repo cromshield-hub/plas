@@ -48,8 +48,11 @@ target_link_libraries(plas_log
 # ---------- plas_config ----------
 add_library(plas_config
     src/config/config.cpp
+    src/config/config_node.cpp
     src/config/json_parser.cpp
     src/config/yaml_parser.cpp
+    src/config/yaml_to_json.cpp
+    src/config/device_parser.cpp
     src/config/property_manager.cpp
     src/config/json_property_parser.cpp
     src/config/yaml_property_parser.cpp

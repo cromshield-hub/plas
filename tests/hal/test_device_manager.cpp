@@ -5,6 +5,7 @@
 #include "plas/hal/interface/i2c.h"
 #include "plas/hal/interface/power_control.h"
 #include "plas/hal/interface/ssd_gpio.h"
+#include "plas/config/config_node.h"
 #include "plas/config/device_entry.h"
 #include "plas/core/error.h"
 
@@ -248,4 +249,58 @@ TEST_F(DeviceManagerTest, DeviceLifecycleInitOpenClose) {
 
     EXPECT_TRUE(device->Close().IsOk());
     EXPECT_EQ(device->GetState(), DeviceState::kClosed);
+}
+
+// --- LoadFromTree tests ---
+
+TEST_F(DeviceManagerTest, LoadFromTreeGrouped) {
+    auto& mgr = DeviceManager::GetInstance();
+
+    auto tree = plas::config::ConfigNode::LoadFromFile(
+        FixturePath("device_manager_grouped.json"));
+    ASSERT_TRUE(tree.IsOk()) << tree.Error().message();
+
+    auto devices_node = tree.Value().GetSubtree("devices");
+    ASSERT_TRUE(devices_node.IsOk());
+
+    auto result = mgr.LoadFromTree(devices_node.Value());
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+
+    EXPECT_EQ(mgr.DeviceCount(), 2u);
+    EXPECT_TRUE(mgr.HasDevice("aardvark0"));
+    EXPECT_TRUE(mgr.HasDevice("pmu3_main"));
+}
+
+TEST_F(DeviceManagerTest, LoadFromConfigWithKeyPath) {
+    auto& mgr = DeviceManager::GetInstance();
+
+    auto result = mgr.LoadFromConfig(
+        FixturePath("device_manager_nested.yaml"), "plas.devices");
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+
+    EXPECT_EQ(mgr.DeviceCount(), 2u);
+    EXPECT_TRUE(mgr.HasDevice("aardvark0"));
+    EXPECT_TRUE(mgr.HasDevice("pmu3_main"));
+}
+
+TEST_F(DeviceManagerTest, LoadFromConfigGroupedJson) {
+    auto& mgr = DeviceManager::GetInstance();
+
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_grouped.json"));
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+
+    EXPECT_EQ(mgr.DeviceCount(), 2u);
+    EXPECT_TRUE(mgr.HasDevice("aardvark0"));
+    EXPECT_TRUE(mgr.HasDevice("pmu3_main"));
+}
+
+TEST_F(DeviceManagerTest, LoadFromConfigGroupedYaml) {
+    auto& mgr = DeviceManager::GetInstance();
+
+    auto result = mgr.LoadFromConfig(FixturePath("device_manager_grouped.yaml"));
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+
+    EXPECT_EQ(mgr.DeviceCount(), 2u);
+    EXPECT_TRUE(mgr.HasDevice("aardvark0"));
+    EXPECT_TRUE(mgr.HasDevice("pmu3_main"));
 }

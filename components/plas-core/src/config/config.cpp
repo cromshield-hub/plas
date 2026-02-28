@@ -2,9 +2,10 @@
 
 #include <algorithm>
 
-#include "plas/core/error.h"
-
+#include "config_node_internal.h"
+#include "device_parser.h"
 #include "json_parser.h"
+#include "plas/core/error.h"
 #include "yaml_parser.h"
 
 namespace plas::config {
@@ -28,6 +29,34 @@ core::Result<Config> Config::LoadFromFile(const std::string& path, ConfigFormat 
             return core::Result<Config>::Err(core::ErrorCode::kInvalidArgument);
     }
 
+    if (parse_result.IsError()) {
+        return core::Result<Config>::Err(parse_result.Error());
+    }
+
+    Config config;
+    config.devices_ = std::move(parse_result).Value();
+    return core::Result<Config>::Ok(std::move(config));
+}
+
+core::Result<Config> Config::LoadFromFile(const std::string& path,
+                                          const std::string& key_path,
+                                          ConfigFormat fmt) {
+    auto tree_result = ConfigNode::LoadFromFile(path, fmt);
+    if (tree_result.IsError()) {
+        return core::Result<Config>::Err(tree_result.Error());
+    }
+
+    auto subtree_result = tree_result.Value().GetSubtree(key_path);
+    if (subtree_result.IsError()) {
+        return core::Result<Config>::Err(subtree_result.Error());
+    }
+
+    return LoadFromNode(subtree_result.Value());
+}
+
+core::Result<Config> Config::LoadFromNode(const ConfigNode& node) {
+    const auto& json = detail::GetNodeJson(node);
+    auto parse_result = detail::ParseDeviceEntries(json);
     if (parse_result.IsError()) {
         return core::Result<Config>::Err(parse_result.Error());
     }
