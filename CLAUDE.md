@@ -1,7 +1,7 @@
 # PLAS — Platform Library Across Systems
 
 ## Project Overview
-C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO, PCI Config/DOE, CXL DVSEC/Mailbox) with driver implementations for Aardvark, FT4222H, PMU3, PMU4, and PciUtils devices.
+C++17 library providing unified HAL (Hardware Abstraction Layer) interfaces (I2C, I3C, Serial, UART, Power Control, SSD GPIO, PCI Config/DOE/BAR, CXL DVSEC/Mailbox) with driver implementations for Aardvark, FT4222H, PMU3, PMU4, and PciUtils devices.
 
 ## Build
 ```bash
@@ -22,7 +22,7 @@ cd build && ctest --output-on-failure
 - `plas::log` — logger (spdlog backend, compile-time selection)
 - `plas::config` — JSON/YAML config parsing, PropertyManager (config→Properties session mapping)
 - `plas::hal` — device interfaces (I2c, PowerControl, SsdGpio, etc.)
-- `plas::hal::pci` — PCI/CXL domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciTopology, Cxl, CxlMailbox)
+- `plas::hal::pci` — PCI/CXL domain types and interfaces (Bdf, PciAddress, PciConfig, PciDoe, PciBar, PciTopology, Cxl, CxlMailbox)
 - `plas::hal::driver` — driver implementations (AardvarkDevice, Pmu3Device, PciUtilsDevice, etc.)
 - `plas::bootstrap` — application initialization helper (Bootstrap class)
 
@@ -115,7 +115,7 @@ plas/
 - **Target**: `plas_bootstrap` (PUBLIC dep: `plas::hal_driver` — transitively includes hal_interface, config, log, core)
 - **Namespace**: `plas::bootstrap`
 - **Types**:
-  - `BootstrapConfig` — device_config_path, device_config_key_path, log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures
+  - `BootstrapConfig` — device_config_path, device_config_key_path, device_config_node (optional ConfigNode), log_config, properties_config_path, auto_open_devices, skip_unknown_drivers, skip_device_failures
   - `DeviceFailure` — nickname, uri, driver, error, phase ("create"/"init"/"open"), detail (human-readable context)
   - `BootstrapResult` — devices_opened, devices_failed, devices_skipped, failures vector
 - **API**:
@@ -128,12 +128,13 @@ plas/
   - `GetDevicesByInterface<T>()` — returns `vector<pair<nickname, T*>>` of all devices supporting interface T
   - `DeviceNames()`, `GetFailures()` — query accessors
   - `DumpDevices() → string` — formatted summary of all devices (nickname, URI, driver, state, interfaces) and failures for debugging
-- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromFile → per-device ValidateUri + DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **Init sequence**: RegisterAllDrivers → Logger::Init → PropertyManager::LoadFromFile → Config::LoadFromNode or Config::LoadFromFile → per-device ValidateUri + DeviceFactory::CreateFromConfig + DeviceManager::AddDevice → per-device Init+Open
+- **In-memory config**: Set `device_config_node` (ConfigNode) to skip file I/O; node takes precedence over `device_config_path` when both are set
 - **URI validation**: Validates `driver://bus:identifier` format before device creation — catches malformed URIs at "create" phase with descriptive detail message
 - **Graceful degradation**: `skip_unknown_drivers` skips unregistered drivers, `skip_device_failures` skips individual device failures — both report via `BootstrapResult::failures` with detail strings
 - **Rollback**: Hard failure mid-init rolls back already-initialized subsystems in reverse order
 - **Pimpl**: Implementation hidden behind `struct Impl` (same pattern as Logger)
-- **Unit tests**: 64 tests in `tests/bootstrap/test_bootstrap.cpp`
+- **Unit tests**: 69 tests in `tests/bootstrap/test_bootstrap.cpp`
 
 ## PCI Topology (sysfs-based)
 - **Class**: `PciTopology` — static utility class for PCI topology traversal and device management
@@ -201,13 +202,14 @@ plas/
 - **Integration tests**: Gated by `PLAS_TEST_FT4222H_PORT` env var (e.g., `0:1`)
 
 ## PciUtils Driver (optional, requires `libpci-dev`)
-- **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`
+- **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`, `PciBar`
 - **Driver name**: `"pciutils"` (config: `driver: pciutils`)
 - **URI**: `pciutils://DDDD:BB:DD.F` (domain:bus:device.function)
 - **Build flag**: `PLAS_WITH_PCIUTILS=ON` (default), auto-detected via `pkg_check_modules(libpci)`
 - **Compile define**: `PLAS_HAS_PCIUTILS=1` when enabled
 - **Config args**: `doe_timeout_ms` (default 1000), `doe_poll_interval_us` (default 100)
 - **DOE**: Full mailbox handshake (Write→GO→Poll Ready→Read) with abort/error recovery
+- **BAR MMIO**: Lazy mmap of sysfs `resourceN` files; cached per bar_index; `O_RDWR | O_SYNC | MAP_SHARED`; auto-unmapped on Close/destruction
 - **Integration tests**: Gated by `PLAS_TEST_PCIUTILS_BDF` env var (e.g., `0000:03:00.0`)
 
 ## CXL Interface (header-only ABCs)
@@ -226,6 +228,14 @@ plas/
 - **Cxl ABC** (`cxl.h`): EnumerateCxlDvsecs, FindCxlDvsec, GetCxlDeviceType, GetRegisterBlocks, ReadDvsecRegister, WriteDvsecRegister
 - **CxlMailbox ABC** (`cxl_mailbox.h`): ExecuteCommand (typed + raw opcode), GetPayloadSize, IsReady, GetBackgroundCmdStatus
 - **Tests**: `test_cxl_types.cpp` (12), `test_cxl.cpp` (15), `test_cxl_mailbox.cpp` (12) — mock device pattern
+
+## PciBar Interface (header-only ABC)
+- **Header**: `components/plas-core/include/plas/hal/interface/pci/pci_bar.h`
+- **Target**: `plas_hal_interface` (header-only, no source file)
+- **API**: `BarRead32`, `BarRead64`, `BarWrite32`, `BarWrite64`, `BarReadBuffer`, `BarWriteBuffer`
+- **Parameters**: `Bdf bdf, uint8_t bar_index (0–5), uint64_t offset`
+- **Implementations**: `PciUtilsDevice` (sysfs resource mmap)
+- **Tests**: `test_pci_bar.cpp` (13 tests) — mock device pattern
 
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`

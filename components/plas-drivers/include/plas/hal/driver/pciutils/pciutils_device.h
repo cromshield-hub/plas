@@ -4,9 +4,11 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "plas/config/device_entry.h"
 #include "plas/hal/interface/device.h"
+#include "plas/hal/interface/pci/pci_bar.h"
 #include "plas/hal/interface/pci/pci_config.h"
 #include "plas/hal/interface/pci/pci_doe.h"
 
@@ -25,7 +27,8 @@ namespace plas::hal::driver {
 ///   doe_poll_interval_us — DOE polling interval in microseconds (default 100)
 class PciUtilsDevice : public Device,
                        public pci::PciConfig,
-                       public pci::PciDoe {
+                       public pci::PciDoe,
+                       public pci::PciBar {
 public:
     explicit PciUtilsDevice(const config::DeviceEntry& entry);
     ~PciUtilsDevice() override;
@@ -65,6 +68,24 @@ public:
         pci::DoeProtocolId protocol,
         const pci::DoePayload& request) override;
 
+    // -- PciBar interface -----------------------------------------------------
+    core::Result<core::DWord> BarRead32(pci::Bdf bdf, uint8_t bar_index,
+                                         uint64_t offset) override;
+    core::Result<core::QWord> BarRead64(pci::Bdf bdf, uint8_t bar_index,
+                                         uint64_t offset) override;
+    core::Result<void> BarWrite32(pci::Bdf bdf, uint8_t bar_index,
+                                   uint64_t offset,
+                                   core::DWord value) override;
+    core::Result<void> BarWrite64(pci::Bdf bdf, uint8_t bar_index,
+                                   uint64_t offset,
+                                   core::QWord value) override;
+    core::Result<void> BarReadBuffer(pci::Bdf bdf, uint8_t bar_index,
+                                      uint64_t offset, void* buffer,
+                                      std::size_t length) override;
+    core::Result<void> BarWriteBuffer(pci::Bdf bdf, uint8_t bar_index,
+                                       uint64_t offset, const void* buffer,
+                                       std::size_t length) override;
+
     /// Self-register with DeviceFactory under driver name "pciutils".
     static void Register();
 
@@ -92,6 +113,16 @@ private:
     core::Result<pci::DoePayload> DoeReadMailbox(pci_dev* dev,
                                                   pci::ConfigOffset doe_offset);
 
+    // BAR mmap helpers
+    struct MappedBar {
+        int fd = -1;
+        void* base = nullptr;
+        uint64_t size = 0;
+    };
+    core::Result<MappedBar*> EnsureBarMapped(uint8_t bar_index);
+    uint64_t GetBarSize(uint8_t bar_index);
+    void UnmapAllBars();
+
     std::string name_;
     std::string uri_;
     DeviceState state_;
@@ -103,6 +134,8 @@ private:
     uint32_t doe_timeout_ms_;
     uint32_t doe_poll_interval_us_;
     std::mutex doe_mutex_;
+    std::unordered_map<uint8_t, MappedBar> mapped_bars_;
+    std::mutex bar_mutex_;
 };
 
 }  // namespace plas::hal::driver

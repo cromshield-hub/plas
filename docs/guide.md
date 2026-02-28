@@ -198,6 +198,7 @@ PLAS가 제공하는 순수 가상 인터페이스(ABC) 목록입니다. 드라�
 | `SsdGpio` | `plas::hal` | SetPerst, SetClkReq, SetDualPort | SSD GPIO 제어 |
 | `PciConfig` | `plas::hal::pci` | ReadConfig8/16/32, FindCapability | PCI 설정 공간 접근 |
 | `PciDoe` | `plas::hal::pci` | DoeDiscover, DoeExchange | PCI DOE 프로토콜 |
+| `PciBar` | `plas::hal::pci` | BarRead32/64, BarWrite32/64, BarReadBuffer/WriteBuffer | PCI BAR MMIO 접근 |
 | `Cxl` | `plas::hal::pci` | EnumerateCxlDvsecs, GetCxlDeviceType | CXL DVSEC 탐색 |
 | `CxlMailbox` | `plas::hal::pci` | ExecuteCommand, IsReady | CXL 메일박스 명령 |
 
@@ -207,7 +208,7 @@ PLAS가 제공하는 순수 가상 인터페이스(ABC) 목록입니다. 드라�
 |----------|----------------|---------|------|
 | `AardvarkDevice` | Device, I2c | Aardvark SDK | 완전 구현 |
 | `Ft4222hDevice` | Device, I2c | FT4222H + D2XX SDK | 완전 구현 |
-| `PciUtilsDevice` | Device, PciConfig, PciDoe | libpci-dev | 완전 구현 |
+| `PciUtilsDevice` | Device, PciConfig, PciDoe, PciBar | libpci-dev | 완전 구현 |
 | `Pmu3Device` | Device, PowerControl, SsdGpio | PMU3 SDK | 스텁 (kNotSupported) |
 | `Pmu4Device` | Device, PowerControl, SsdGpio | PMU4 SDK | 스텁 (kNotSupported) |
 
@@ -401,6 +402,54 @@ auto node = plas::config::ConfigNode::LoadFromFile("config.yaml");
 if (node.IsOk()) {
     auto subtree = node.Value().GetSubtree("plas.devices");
     // subtree.Value().IsMap(), IsArray(), IsScalar(), IsNull()
+}
+```
+
+### Bootstrap 인메모리 설정 (파일 없이 초기화)
+
+파일 경로 대신 `ConfigNode`를 직접 전달하여 Bootstrap을 초기화할 수 있습니다. 상위 애플리케이션에서 이미 파싱된 설정을 재사용할 때 유용합니다:
+
+```cpp
+#include "plas/bootstrap/bootstrap.h"
+#include "plas/config/config_node.h"
+
+// 1) 파일에서 ConfigNode 로드 후 서브트리 추출
+auto node = plas::config::ConfigNode::LoadFromFile("app_config.yaml");
+auto devices = node.Value().GetSubtree("plas.devices");
+
+// 2) device_config_node에 설정 — 파일 I/O 불필요
+plas::bootstrap::BootstrapConfig cfg;
+cfg.device_config_node = devices.Value();
+
+plas::bootstrap::Bootstrap bs;
+auto result = bs.Init(cfg);
+```
+
+`device_config_node`와 `device_config_path`를 동시에 설정하면 `device_config_node`가 우선합니다.
+
+### PCI BAR MMIO 접근
+
+PCI BAR (Base Address Register) 영역의 MMIO 레지스터를 읽고 씁니다. NVMe Controller Registers (CAP, VS, CC, CSTS) 등에 접근할 때 사용합니다:
+
+```cpp
+#include "plas/hal/interface/pci/pci_bar.h"
+
+auto* bar = bs.GetInterface<plas::hal::pci::PciBar>("nvme0");
+if (bar) {
+    plas::hal::pci::Bdf bdf{0x03, 0x00, 0x00};
+
+    // NVMe Controller Capabilities (BAR0, offset 0x00)
+    auto cap = bar->BarRead64(bdf, 0, 0x00);
+    if (cap.IsOk()) {
+        // cap.Value() = CAP register
+    }
+
+    // NVMe Controller Status (BAR0, offset 0x1C)
+    auto csts = bar->BarRead32(bdf, 0, 0x1C);
+
+    // 벌크 읽기
+    uint8_t buf[64];
+    bar->BarReadBuffer(bdf, 0, 0x00, buf, sizeof(buf));
 }
 ```
 

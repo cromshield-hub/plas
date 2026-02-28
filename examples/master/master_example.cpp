@@ -11,8 +11,10 @@
 ///  5. DeviceFailure::detail — rich error reporting on failures
 ///  6. I2C read on the first Aardvark
 ///  7. PCI config register reads (Vendor/Device ID, Class Code, capabilities)
-///  8. PCI topology walk for the NVMe device
-///  9. Bootstrap::Deinit() — close all, cleanup
+///  8. PCI BAR0 register reads (NVMe Controller Registers)
+///  9. PCI topology walk for the NVMe device
+/// 10. Bootstrap::Init() with in-memory ConfigNode (no file I/O)
+/// 11. Bootstrap::Deinit() — close all, cleanup
 ///
 /// Usage:
 ///   ./master_example                          -- run with default config
@@ -24,8 +26,10 @@
 #include <string>
 
 #include "plas/bootstrap/bootstrap.h"
+#include "plas/config/config_node.h"
 #include "plas/hal/interface/device.h"
 #include "plas/hal/interface/i2c.h"
+#include "plas/hal/interface/pci/pci_bar.h"
 #include "plas/hal/interface/pci/pci_config.h"
 #include "plas/hal/interface/pci/pci_topology.h"
 #include "plas/hal/interface/pci/types.h"
@@ -224,9 +228,50 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 8. PCI topology walk for the NVMe device
+    // 8. PCI BAR0 register reads (NVMe Controller Registers)
     // -----------------------------------------------------------------------
-    std::printf("\n[8] PCI topology walk (nvme0):\n");
+    std::printf("\n[8] PCI BAR0 read (nvme0):\n");
+    auto* pcibar = bs.GetInterface<PciBar>("nvme0");
+    if (!pcibar) {
+        std::printf("    Skipped -- PciBar interface not available\n");
+    } else {
+        auto* nvme_bar = bs.GetDevice("nvme0");
+        auto bar_addr = PciAddress::FromString(
+            nvme_bar->GetUri().substr(12));
+        if (bar_addr.IsError()) {
+            std::printf("    Cannot parse BDF from URI\n");
+        } else {
+            Bdf bar_bdf = bar_addr.Value().bdf;
+
+            // NVMe CAP register (BAR0, offset 0x00, 64-bit)
+            auto cap = pcibar->BarRead64(bar_bdf, 0, 0x00);
+            if (cap.IsOk())
+                std::printf("    CAP:  0x%016lX\n",
+                            static_cast<unsigned long>(cap.Value()));
+            else
+                std::printf("    CAP:  read failed (%s)\n",
+                            cap.Error().message().c_str());
+
+            // NVMe VS register (BAR0, offset 0x08, 32-bit)
+            auto vs = pcibar->BarRead32(bar_bdf, 0, 0x08);
+            if (vs.IsOk()) {
+                uint32_t v = vs.Value();
+                std::printf("    VS:   %u.%u.%u\n",
+                            (v >> 16) & 0xFFFF, (v >> 8) & 0xFF, v & 0xFF);
+            }
+
+            // NVMe CSTS register (BAR0, offset 0x1C, 32-bit)
+            auto csts = pcibar->BarRead32(bar_bdf, 0, 0x1C);
+            if (csts.IsOk())
+                std::printf("    CSTS: 0x%08X (RDY=%u)\n",
+                            csts.Value(), csts.Value() & 0x1);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 9. PCI topology walk for the NVMe device
+    // -----------------------------------------------------------------------
+    std::printf("\n[9] PCI topology walk (nvme0):\n");
     {
         auto* nvme_dev = bs.GetDevice("nvme0");
         if (!nvme_dev) {
@@ -257,9 +302,46 @@ int main(int argc, char* argv[]) {
     }
 
     // -----------------------------------------------------------------------
-    // 9. Cleanup — let Bootstrap handle it
+    // 10. Bootstrap::Init with in-memory ConfigNode (no file I/O)
     // -----------------------------------------------------------------------
-    std::printf("\n[9] Shutting down...\n");
+    std::printf("\n[10] In-memory ConfigNode init:\n");
+    {
+        // Tear down current bootstrap first
+        bs.Deinit();
+
+        // Load file into ConfigNode, then pass the subtree directly
+        auto node = plas::config::ConfigNode::LoadFromFile(config_path);
+        if (node.IsError()) {
+            std::printf("    Failed to load config: %s\n",
+                        node.Error().message().c_str());
+        } else {
+            auto subtree = node.Value().GetSubtree("plas.devices");
+            if (subtree.IsError()) {
+                std::printf("    Failed to get subtree: %s\n",
+                            subtree.Error().message().c_str());
+            } else {
+                BootstrapConfig mem_cfg;
+                mem_cfg.device_config_node = subtree.Value();
+                mem_cfg.skip_unknown_drivers = true;
+                mem_cfg.skip_device_failures = true;
+
+                auto mem_result = bs.Init(mem_cfg);
+                if (mem_result.IsOk()) {
+                    std::printf("    Success: %zu devices via ConfigNode "
+                                "(no temp files!)\n",
+                                mem_result.Value().devices_opened);
+                } else {
+                    std::printf("    Init failed: %s\n",
+                                mem_result.Error().message().c_str());
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 11. Cleanup — let Bootstrap handle it
+    // -----------------------------------------------------------------------
+    std::printf("\n[11] Shutting down...\n");
     bs.Deinit();
 
     std::printf("\n=== Done ===\n");

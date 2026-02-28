@@ -3,7 +3,13 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 #include <thread>
+
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 extern "C" {
 #include <pci/pci.h>
@@ -113,6 +119,7 @@ PciUtilsDevice::PciUtilsDevice(const config::DeviceEntry& entry)
 }
 
 PciUtilsDevice::~PciUtilsDevice() {
+    UnmapAllBars();
     if (pacc_) {
         pci_cleanup(pacc_);
         pacc_ = nullptr;
@@ -163,6 +170,8 @@ core::Result<void> PciUtilsDevice::Close() {
     if (state_ != DeviceState::kOpen) {
         return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
     }
+
+    UnmapAllBars();
 
     if (pacc_) {
         pci_cleanup(pacc_);
@@ -615,6 +624,219 @@ core::Result<pci::DoePayload> PciUtilsDevice::DoeExchange(
     pci::DoePayload payload(full_response.begin() + 2,
                             full_response.end());
     return core::Result<pci::DoePayload>::Ok(std::move(payload));
+}
+
+// ---------------------------------------------------------------------------
+// PciBar — BAR MMIO helpers
+// ---------------------------------------------------------------------------
+
+std::string FormatSysfsPath(uint16_t domain, uint8_t bus, uint8_t device,
+                            uint8_t function) {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "/sys/bus/pci/devices/%04x:%02x:%02x.%x",
+                  domain, bus, device, function);
+    return buf;
+}
+
+uint64_t PciUtilsDevice::GetBarSize(uint8_t bar_index) {
+    auto sysfs = FormatSysfsPath(domain_, bus_, device_num_, function_);
+    std::ifstream resource(sysfs + "/resource");
+    if (!resource.is_open()) {
+        return 0;
+    }
+
+    std::string line;
+    for (uint8_t i = 0; i <= bar_index; ++i) {
+        if (!std::getline(resource, line)) {
+            return 0;
+        }
+    }
+
+    // Each line: start_addr end_addr flags (hex)
+    uint64_t start = 0, end = 0, flags = 0;
+    std::istringstream iss(line);
+    iss >> std::hex >> start >> end >> flags;
+    if (end == 0 || end < start) {
+        return 0;
+    }
+    return end - start + 1;
+}
+
+core::Result<PciUtilsDevice::MappedBar*>
+PciUtilsDevice::EnsureBarMapped(uint8_t bar_index) {
+    if (bar_index > 5) {
+        return core::Result<MappedBar*>::Err(core::ErrorCode::kInvalidArgument);
+    }
+
+    std::lock_guard<std::mutex> lock(bar_mutex_);
+
+    auto it = mapped_bars_.find(bar_index);
+    if (it != mapped_bars_.end()) {
+        return core::Result<MappedBar*>::Ok(&it->second);
+    }
+
+    uint64_t size = GetBarSize(bar_index);
+    if (size == 0) {
+        return core::Result<MappedBar*>::Err(core::ErrorCode::kNotFound);
+    }
+
+    auto sysfs = FormatSysfsPath(domain_, bus_, device_num_, function_);
+    std::string resource_path = sysfs + "/resource" + std::to_string(bar_index);
+
+    int fd = ::open(resource_path.c_str(), O_RDWR | O_SYNC);
+    if (fd < 0) {
+        PLAS_LOG_ERROR("PciUtilsDevice: cannot open " + resource_path);
+        return core::Result<MappedBar*>::Err(core::ErrorCode::kPermissionDenied);
+    }
+
+    void* base = ::mmap(nullptr, static_cast<std::size_t>(size),
+                        PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (base == MAP_FAILED) {
+        PLAS_LOG_ERROR("PciUtilsDevice: mmap failed for " + resource_path);
+        ::close(fd);
+        return core::Result<MappedBar*>::Err(core::ErrorCode::kIOError);
+    }
+
+    MappedBar bar;
+    bar.fd = fd;
+    bar.base = base;
+    bar.size = size;
+    auto [inserted, _] = mapped_bars_.emplace(bar_index, bar);
+    return core::Result<MappedBar*>::Ok(&inserted->second);
+}
+
+void PciUtilsDevice::UnmapAllBars() {
+    for (auto& [idx, bar] : mapped_bars_) {
+        if (bar.base && bar.base != MAP_FAILED) {
+            ::munmap(bar.base, static_cast<std::size_t>(bar.size));
+        }
+        if (bar.fd >= 0) {
+            ::close(bar.fd);
+        }
+    }
+    mapped_bars_.clear();
+}
+
+// ---------------------------------------------------------------------------
+// PciBar — typed reads/writes
+// ---------------------------------------------------------------------------
+
+core::Result<core::DWord> PciUtilsDevice::BarRead32(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<core::DWord>::Err(core::ErrorCode::kNotInitialized);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<core::DWord>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + sizeof(core::DWord) > bar->size) {
+        return core::Result<core::DWord>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* ptr = reinterpret_cast<volatile uint32_t*>(
+        static_cast<uint8_t*>(bar->base) + offset);
+    return core::Result<core::DWord>::Ok(*ptr);
+}
+
+core::Result<core::QWord> PciUtilsDevice::BarRead64(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<core::QWord>::Err(core::ErrorCode::kNotInitialized);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<core::QWord>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + sizeof(core::QWord) > bar->size) {
+        return core::Result<core::QWord>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* ptr = reinterpret_cast<volatile uint64_t*>(
+        static_cast<uint8_t*>(bar->base) + offset);
+    return core::Result<core::QWord>::Ok(*ptr);
+}
+
+core::Result<void> PciUtilsDevice::BarWrite32(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset, core::DWord value) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<void>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + sizeof(core::DWord) > bar->size) {
+        return core::Result<void>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* ptr = reinterpret_cast<volatile uint32_t*>(
+        static_cast<uint8_t*>(bar->base) + offset);
+    *ptr = value;
+    return core::Result<void>::Ok();
+}
+
+core::Result<void> PciUtilsDevice::BarWrite64(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset, core::QWord value) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<void>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + sizeof(core::QWord) > bar->size) {
+        return core::Result<void>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* ptr = reinterpret_cast<volatile uint64_t*>(
+        static_cast<uint8_t*>(bar->base) + offset);
+    *ptr = value;
+    return core::Result<void>::Ok();
+}
+
+core::Result<void> PciUtilsDevice::BarReadBuffer(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset, void* buffer,
+    std::size_t length) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
+    }
+    if (!buffer || length == 0) {
+        return core::Result<void>::Err(core::ErrorCode::kInvalidArgument);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<void>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + length > bar->size) {
+        return core::Result<void>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* src = static_cast<uint8_t*>(bar->base) + offset;
+    std::memcpy(buffer, src, length);
+    return core::Result<void>::Ok();
+}
+
+core::Result<void> PciUtilsDevice::BarWriteBuffer(
+    pci::Bdf bdf, uint8_t bar_index, uint64_t offset, const void* buffer,
+    std::size_t length) {
+    if (state_ != DeviceState::kOpen) {
+        return core::Result<void>::Err(core::ErrorCode::kNotInitialized);
+    }
+    if (!buffer || length == 0) {
+        return core::Result<void>::Err(core::ErrorCode::kInvalidArgument);
+    }
+    auto bar_result = EnsureBarMapped(bar_index);
+    if (bar_result.IsError()) {
+        return core::Result<void>::Err(bar_result.Error());
+    }
+    auto* bar = bar_result.Value();
+    if (offset + length > bar->size) {
+        return core::Result<void>::Err(core::ErrorCode::kOutOfRange);
+    }
+    auto* dst = static_cast<uint8_t*>(bar->base) + offset;
+    std::memcpy(dst, buffer, length);
+    return core::Result<void>::Ok();
 }
 
 // ---------------------------------------------------------------------------

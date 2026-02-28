@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "plas/config/config_format.h"
+#include "plas/config/config_node.h"
 #include "plas/core/error.h"
 #include "plas/core/result.h"
 #include "plas/hal/device_manager.h"
@@ -22,6 +23,7 @@ struct BootstrapConfig {
     std::string device_config_path;
     std::string device_config_key_path;
     config::ConfigFormat device_config_format = config::ConfigFormat::kAuto;
+    std::optional<config::ConfigNode> device_config_node;
 
     std::optional<log::LogConfig> log_config;
 

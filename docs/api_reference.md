@@ -564,6 +564,25 @@ class PciDoe {
 };
 ```
 
+### PciBar — `plas::hal::pci` (`hal/interface/pci/pci_bar.h`)
+
+PCI BAR (Base Address Register) MMIO 접근 인터페이스입니다.
+
+```cpp
+class PciBar {
+    virtual Result<DWord> BarRead32(Bdf bdf, uint8_t bar_index, uint64_t offset) = 0;
+    virtual Result<QWord> BarRead64(Bdf bdf, uint8_t bar_index, uint64_t offset) = 0;
+    virtual Result<void> BarWrite32(Bdf bdf, uint8_t bar_index, uint64_t offset, DWord value) = 0;
+    virtual Result<void> BarWrite64(Bdf bdf, uint8_t bar_index, uint64_t offset, QWord value) = 0;
+    virtual Result<void> BarReadBuffer(Bdf bdf, uint8_t bar_index, uint64_t offset, void* buffer, size_t length) = 0;
+    virtual Result<void> BarWriteBuffer(Bdf bdf, uint8_t bar_index, uint64_t offset, const void* buffer, size_t length) = 0;
+};
+```
+
+- `bar_index`: BAR 번호 (0–5)
+- `offset`: BAR 영역 내 바이트 오프셋
+- PciUtilsDevice는 sysfs `resourceN` 파일의 mmap을 통해 구현
+
 ### PciTopology — `plas::hal::pci` (`hal/interface/pci/pci_topology.h`)
 
 sysfs 기반 PCI 토폴로지 탐색 유틸리티입니다 (모든 메서드가 static).
@@ -763,7 +782,7 @@ class Ft4222hDevice : public Device, public I2c {
 libpci 기반 PCI config/DOE 드라이버입니다.
 
 ```cpp
-class PciUtilsDevice : public Device, public pci::PciConfig, public pci::PciDoe {
+class PciUtilsDevice : public Device, public pci::PciConfig, public pci::PciDoe, public pci::PciBar {
     explicit PciUtilsDevice(const config::DeviceEntry& entry);
     static void Register();   // 드라이버 이름: "pciutils"
 };
@@ -774,7 +793,7 @@ class PciUtilsDevice : public Device, public pci::PciConfig, public pci::PciDoe 
 | 드라이버 이름 | `pciutils` |
 | URI 형식 | `pciutils://DDDD:BB:DD.F` (도메인:버스:디바이스.기능) |
 | SDK 필요 | libpci-dev (`PLAS_HAS_PCIUTILS`) |
-| 구현 인터페이스 | `Device`, `PciConfig`, `PciDoe` |
+| 구현 인터페이스 | `Device`, `PciConfig`, `PciDoe`, `PciBar` |
 | 설정 인수 | `doe_timeout_ms` (기본 1000), `doe_poll_interval_us` (기본 100) |
 
 ### Pmu3Device (`hal/driver/pmu3/pmu3_device.h`)
@@ -826,6 +845,7 @@ struct BootstrapConfig {
     std::string device_config_path;          // 디바이스 설정 파일 경로
     std::string device_config_key_path;      // 설정 내 서브트리 경로 (예: "plas.devices")
     ConfigFormat device_config_format = ConfigFormat::kAuto;
+    std::optional<ConfigNode> device_config_node;  // 인메모리 설정 (파일 경로 대신 사용 가능)
 
     std::optional<LogConfig> log_config;     // 로거 설정 (생략 시 초기화 안 함)
 
@@ -905,7 +925,7 @@ class Bootstrap {
 1. `RegisterAllDrivers()` — 사용 가능한 드라이버 등록
 2. `Logger::Init()` — 로거 초기화 (설정된 경우)
 3. `PropertyManager::LoadFromFile()` — Properties 로드 (설정된 경우)
-4. `Config::LoadFromFile()` — 디바이스 설정 파싱
+4. `Config::LoadFromNode()` 또는 `Config::LoadFromFile()` — 디바이스 설정 파싱 (`device_config_node` 설정 시 파일 I/O 없이 인메모리 로드)
 5. 디바이스별: `ValidateUri()` → `DeviceFactory::CreateFromConfig()` → `DeviceManager::AddDevice()` → `Init()` → `Open()`
 
 **실패 처리**:

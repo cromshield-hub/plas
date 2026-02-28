@@ -13,6 +13,7 @@
 #include "plas/hal/interface/serial.h"
 #include "plas/hal/interface/ssd_gpio.h"
 #include "plas/hal/interface/uart.h"
+#include "plas/hal/interface/pci/pci_bar.h"
 #include "plas/hal/interface/pci/pci_config.h"
 #include "plas/hal/interface/pci/pci_doe.h"
 #include "plas/hal/interface/pci/cxl.h"
@@ -72,6 +73,7 @@ std::string ProbeInterfaces(hal::Device* dev) {
     if (dynamic_cast<hal::SsdGpio*>(dev))          append("SsdGpio");
     if (dynamic_cast<hal::pci::PciConfig*>(dev))   append("PciConfig");
     if (dynamic_cast<hal::pci::PciDoe*>(dev))      append("PciDoe");
+    if (dynamic_cast<hal::pci::PciBar*>(dev))      append("PciBar");
     if (dynamic_cast<hal::pci::Cxl*>(dev))         append("Cxl");
     if (dynamic_cast<hal::pci::CxlMailbox*>(dev))  append("CxlMailbox");
 
@@ -156,7 +158,7 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
             core::ErrorCode::kAlreadyOpen);
     }
 
-    if (cfg.device_config_path.empty()) {
+    if (cfg.device_config_path.empty() && !cfg.device_config_node.has_value()) {
         return core::Result<BootstrapResult>::Err(
             core::ErrorCode::kInvalidArgument);
     }
@@ -183,13 +185,18 @@ core::Result<BootstrapResult> Bootstrap::Init(const BootstrapConfig& cfg) {
     }
 
     // 4. Parse device config
-    core::Result<config::Config> config_result =
-        cfg.device_config_key_path.empty()
-            ? config::Config::LoadFromFile(cfg.device_config_path,
-                                           cfg.device_config_format)
-            : config::Config::LoadFromFile(cfg.device_config_path,
-                                           cfg.device_config_key_path,
-                                           cfg.device_config_format);
+    core::Result<config::Config> config_result = [&]() -> core::Result<config::Config> {
+        if (cfg.device_config_node.has_value()) {
+            return config::Config::LoadFromNode(cfg.device_config_node.value());
+        }
+        if (!cfg.device_config_key_path.empty()) {
+            return config::Config::LoadFromFile(cfg.device_config_path,
+                                                cfg.device_config_key_path,
+                                                cfg.device_config_format);
+        }
+        return config::Config::LoadFromFile(cfg.device_config_path,
+                                            cfg.device_config_format);
+    }();
 
     if (config_result.IsError()) {
         // Rollback properties if loaded

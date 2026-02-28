@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "plas/bootstrap/bootstrap.h"
+#include "plas/config/config_node.h"
 #include "plas/config/property_manager.h"
 #include "plas/core/error.h"
 #include "plas/core/properties.h"
@@ -712,4 +713,86 @@ TEST_F(BootstrapTest, FailureDetailOnInitError) {
     ASSERT_EQ(failures.size(), 1u);
     EXPECT_FALSE(failures[0].detail.empty());
     EXPECT_NE(failures[0].detail.find("init failed"), std::string::npos);
+}
+
+// ===========================================================================
+// Init with ConfigNode (in-memory config)
+// ===========================================================================
+
+TEST_F(BootstrapTest, InitWithConfigNode) {
+    // Load the fixture file into a ConfigNode, navigate to "devices" subtree
+    auto node_result = plas::config::ConfigNode::LoadFromFile(
+        FixturePath("bootstrap_basic_config.yaml"));
+    ASSERT_TRUE(node_result.IsOk()) << node_result.Error().message();
+
+    auto subtree = node_result.Value().GetSubtree("devices");
+    ASSERT_TRUE(subtree.IsOk()) << subtree.Error().message();
+
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_node = subtree.Value();
+
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+    EXPECT_TRUE(bs.IsInitialized());
+    EXPECT_EQ(result.Value().devices_opened, 2u);
+    EXPECT_EQ(result.Value().devices_failed, 0u);
+}
+
+TEST_F(BootstrapTest, InitWithConfigNodeGroupedConfig) {
+    // Load grouped format, navigate to the subtree
+    auto node_result = plas::config::ConfigNode::LoadFromFile(
+        FixturePath("bootstrap_grouped_config.yaml"));
+    ASSERT_TRUE(node_result.IsOk()) << node_result.Error().message();
+
+    auto subtree = node_result.Value().GetSubtree("plas.devices");
+    ASSERT_TRUE(subtree.IsOk()) << subtree.Error().message();
+
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_node = subtree.Value();
+
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+    EXPECT_EQ(result.Value().devices_opened, 2u);
+}
+
+TEST_F(BootstrapTest, InitWithConfigNodePrecedenceOverPath) {
+    // Set both: valid node + nonexistent path → node should win
+    auto node_result = plas::config::ConfigNode::LoadFromFile(
+        FixturePath("bootstrap_basic_config.yaml"));
+    ASSERT_TRUE(node_result.IsOk());
+
+    auto subtree = node_result.Value().GetSubtree("devices");
+    ASSERT_TRUE(subtree.IsOk());
+
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_node = subtree.Value();
+    cfg.device_config_path = "nonexistent_file_should_be_ignored.yaml";
+
+    auto result = bs.Init(cfg);
+    ASSERT_TRUE(result.IsOk()) << result.Error().message();
+    EXPECT_EQ(result.Value().devices_opened, 2u);
+}
+
+TEST_F(BootstrapTest, InitWithEmptyConfigNode) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    cfg.device_config_node = plas::config::ConfigNode{};
+
+    auto result = bs.Init(cfg);
+    // Default-constructed ConfigNode is null/empty — LoadFromNode should fail
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST_F(BootstrapTest, InitNeitherPathNorNode) {
+    Bootstrap bs;
+    BootstrapConfig cfg;
+    // Both device_config_path and device_config_node unset
+
+    auto result = bs.Init(cfg);
+    EXPECT_TRUE(result.IsError());
+    EXPECT_EQ(result.Error(),
+              plas::core::make_error_code(ErrorCode::kInvalidArgument));
 }
