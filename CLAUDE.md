@@ -32,7 +32,7 @@ cd build && ctest --output-on-failure
 | `plas_log` | `plas_core` | spdlog |
 | `plas_config` | `plas_core` | nlohmann_json, yaml-cpp |
 | `plas_hal_interface` | `plas_core`, `plas_log`, `plas_config` | |
-| `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | libpci (optional, for pciutils driver) |
+| `plas_hal_driver` | `plas_hal_interface`, `plas_config`, `plas_log` | Aardvark SDK, FT4222H SDK, PMU3 SDK, PMU4 SDK, libpci — all optional |
 
 ## Key Design Decisions
 - **Error handling**: `std::error_code` + `Result<T>` (no exceptions)
@@ -40,8 +40,9 @@ cd build && ctest --output-on-failure
 - **Config parsers**: PRIVATE linked, no third-party types in public API
 - **Multi-interface drivers**: Multiple inheritance from pure virtual ABCs
 - **Capability check**: `dynamic_cast` on Device pointer
-- **URI scheme**: `driver://bus:identifier` (pciutils: `pciutils://DDDD:BB:DD.F`)
-- **Optional drivers**: Conditional build via `pkg_check_modules`; missing system libs → driver skipped
+- **URI scheme**: `driver://bus:identifier` (aardvark: `aardvark://port:address`, pciutils: `pciutils://DDDD:BB:DD.F`)
+- **Optional drivers**: Conditional build via CMake Find modules; missing SDK → driver compiles as stub (`#ifdef PLAS_HAS_*`)
+- **Vendor SDKs**: Bundled in `vendor/` directory (headers + prebuilt libs per platform/arch); searched first, then system paths
 
 ## Project Structure
 ```
@@ -66,7 +67,15 @@ plas/
 │       ├── CMakeLists.txt
 │       ├── include/plas/hal/driver/
 │       └── src/hal/driver/
-├── cmake/
+├── vendor/                    ← proprietary SDK headers + prebuilt libs
+│   ├── aardvark/
+│   │   ├── include/           ← aardvark.h
+│   │   ├── linux/{x86_64,aarch64}/
+│   │   └── windows/x86_64/
+│   ├── ft4222h/               ← (same layout)
+│   ├── pmu3/
+│   └── pmu4/
+├── cmake/                     ← FindAardvark, FindFT4222H, FindPMU3, FindPMU4
 ├── tests/
 ├── examples/
 │   ├── core/                  ← Properties session CRUD
@@ -112,6 +121,34 @@ plas/
 - **Unit tests**: 22 tests with fake sysfs directory structure (`test_pci_topology.cpp`)
 - **Integration tests**: Gated by `PLAS_TEST_PCI_TOPOLOGY_BDF` env var (`test_pci_topology_integration.cpp`)
 
+## Vendor SDK Management
+- **Location**: `vendor/<sdk>/include/` (headers) + `vendor/<sdk>/<platform>/<arch>/` (prebuilt libs)
+- **Platforms**: `linux/x86_64`, `linux/aarch64`, `windows/x86_64`
+- **CMake Find modules**: `cmake/Find{Aardvark,FT4222H,PMU3,PMU4}.cmake`
+- **Search order**: `vendor/` → `*_ROOT` variable/env → system paths
+- **Build options**: `PLAS_WITH_<SDK>=ON` (default), auto-detected; `PLAS_HAS_<SDK>=1` compile define when found
+- **Behavior when absent**: Driver compiles as stub — lifecycle works, I/O returns `kNotSupported`
+
+| SDK | Find Module | Header | Library | Define |
+|-----|------------|--------|---------|--------|
+| Aardvark | `FindAardvark` | `aardvark.h` | `libaardvark` | `PLAS_HAS_AARDVARK` |
+| FT4222H | `FindFT4222H` | `libft4222.h` | `libft4222` | `PLAS_HAS_FT4222H` |
+| PMU3 | `FindPMU3` | `pmu3.h` | `libpmu3` | `PLAS_HAS_PMU3` |
+| PMU4 | `FindPMU4` | `pmu4.h` | `libpmu4` | `PLAS_HAS_PMU4` |
+
+## Aardvark Driver (optional, requires Aardvark SDK)
+- **Class**: `AardvarkDevice` — implements `Device`, `I2c`
+- **Driver name**: `"aardvark"` (config: `driver: aardvark`)
+- **URI**: `aardvark://port:address` (port: decimal 0–65535, address: 7-bit I2C 0x00–0x7F)
+- **Build flag**: `PLAS_WITH_AARDVARK=ON` (default), auto-detected via `FindAardvark.cmake`
+- **Compile define**: `PLAS_HAS_AARDVARK=1` when enabled
+- **Config args**: `bitrate` (Hz, default 100000), `pullup` (true/false, default true), `bus_timeout_ms` (default 200)
+- **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open (aa_open + configure) → kOpen → Close (aa_close) → kClosed
+- **I2C ops**: `aa_i2c_read`, `aa_i2c_write`, `aa_i2c_write_read` — mutex-serialized, length ≤ 0xFFFF
+- **Error mapping**: SDK error codes → `core::ErrorCode` (kIOError, kTimeout, kNotSupported, kDataLoss)
+- **Unit tests**: 33 tests in `test_aardvark_device.cpp` (always built, no SDK required)
+- **Integration tests**: Gated by `PLAS_TEST_AARDVARK_PORT` env var (e.g., `0:0x50`)
+
 ## PciUtils Driver (optional, requires `libpci-dev`)
 - **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`
 - **Driver name**: `"pciutils"` (config: `driver: pciutils`)
@@ -142,7 +179,11 @@ plas/
 ## Adding a New Driver
 1. Create header in `components/plas-drivers/include/plas/hal/driver/<name>/<name>_device.h`
 2. Inherit from `Device` + relevant interface ABCs
-3. Implement stub in `components/plas-drivers/src/hal/driver/<name>/<name>_device.cpp`
+3. Implement in `components/plas-drivers/src/hal/driver/<name>/<name>_device.cpp` with `#ifdef PLAS_HAS_<NAME>` for SDK calls (stub fallback when SDK absent)
 4. Add static `Register()` method that calls `DeviceFactory::RegisterDriver()`
 5. Add source to `components/plas-drivers/CMakeLists.txt` (plas_hal_driver target)
-6. Add tests in `tests/hal/`
+6. If proprietary SDK required:
+   - Create `cmake/Find<Name>.cmake` (search `vendor/` → `*_ROOT` → system)
+   - Add `vendor/<name>/{include, linux/x86_64, windows/x86_64}` directories
+   - Add conditional block in `components/plas-drivers/CMakeLists.txt` (`PLAS_WITH_<NAME>` option + find + link + define)
+7. Add tests in `tests/hal/` (unit tests always built, integration tests gated by `PLAS_HAS_<NAME>`)

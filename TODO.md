@@ -28,6 +28,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | `plas_hal_interface` (Device, DeviceFactory, DeviceManager) | **Done** | ABC + 팩토리 패턴 + config→인스턴스 레지스트리, grouped config 지원 |
 | CMake / FetchContent / install | **Done** | PlasInstall.cmake 포함 |
 | Monorepo 구조 (`components/`) | **Done** | plas-core (인프라+인터페이스), plas-drivers (드라이버) |
+| Vendor SDK 동봉 (`vendor/`) | **Done** | 플랫폼/아키텍처별 SDK 번들링, CMake Find 모듈 자동 탐색 |
 
 ### Interfaces (ABC 정의)
 
@@ -47,7 +48,7 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 
 | 드라이버 | 구현 인터페이스 | 상태 |
 |----------|----------------|------|
-| AardvarkDevice | Device, I2c | **Stub** — lifecycle만 동작, I2C R/W는 kNotSupported |
+| AardvarkDevice | Device, I2c | **Done** — SDK 있으면 실제 I2C, 없으면 stub (33 unit + 6 integration tests) |
 | Ft4222hDevice | Device, I2c | **Stub** — lifecycle만 동작, I2C R/W는 kNotSupported |
 | Pmu3Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
 | Pmu4Device | Device, PowerControl, SsdGpio | **Stub** — lifecycle만 동작, 기능 메서드 kNotSupported |
@@ -85,7 +86,9 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 | PCI (topology) | 22 | **Pass** |
 | PCI (topology integration) | 6 | **Skip** (env-gated) |
 | CXL (types, cxl, mailbox) | 40 | **Pass** |
-| **합계** | **336** | **All Pass** (330 run + 6 skipped) |
+| HAL (aardvark unit) | 33 | **Pass** |
+| HAL (aardvark integration) | 6 | **Skip** (env-gated, `PLAS_TEST_AARDVARK_PORT`) |
+| **합계** | **369** | **All Pass** (363 run + 6 skipped) |
 
 ---
 
@@ -137,7 +140,14 @@ C++17 기반 **하드웨어 백엔드 통합 라이브러리**. I2C, I3C, Serial
 
 ### P2 — 드라이버 실제 구현
 
-- [ ] Aardvark I2C 실제 구현 (libAardvark 연동)
+- [x] Aardvark I2C 실제 구현 (2026-02-28)
+  - URI 파싱 (`aardvark://port:address`), 엄격한 state machine, config args (bitrate/pullup/bus_timeout_ms)
+  - `#ifdef PLAS_HAS_AARDVARK` 조건부 SDK 호출 (aa_open/aa_i2c_read/write/write_read), 에러 매핑
+  - 33 unit tests (SDK 없이 동작) + 6 integration tests (PLAS_TEST_AARDVARK_PORT env-gated)
+- [x] Vendor SDK 동봉 인프라 구축 (2026-02-28)
+  - `vendor/<sdk>/{include, linux/{x86_64,aarch64}, windows/x86_64}` 디렉토리 구조
+  - `cmake/Find{Aardvark,FT4222H,PMU3,PMU4}.cmake` — vendor/ 우선 탐색 → *_ROOT → 시스템
+  - `PLAS_WITH_<SDK>` 옵션 + `PLAS_HAS_<SDK>` 컴파일 정의, 모든 드라이버 항상 빌드 (SDK 조건부 링크)
 - [ ] FT4222H I2C 실제 구현 (libft4222 연동)
 - [ ] PMU3 PowerControl/SsdGpio 실제 구현
 - [ ] PMU4 PowerControl/SsdGpio 실제 구현
