@@ -131,6 +131,19 @@ if(PLAS_HAS_AARDVARK)
     gtest_discover_tests(test_aardvark_integration)
 endif()
 
+# FT4222H driver tests (unit tests always, integration gated by SDK)
+add_executable(test_ft4222h_device hal/driver/test_ft4222h_device.cpp)
+target_link_libraries(test_ft4222h_device
+    PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+gtest_discover_tests(test_ft4222h_device)
+
+if(PLAS_HAS_FT4222H)
+    add_executable(test_ft4222h_integration hal/driver/test_ft4222h_integration.cpp)
+    target_link_libraries(test_ft4222h_integration
+        PRIVATE plas::hal_interface plas::hal_driver GTest::gtest_main)
+    gtest_discover_tests(test_ft4222h_integration)
+endif()
+
 # PciUtils driver tests (conditional on libpci availability)
 if(PLAS_HAS_PCIUTILS)
     add_executable(test_pciutils_device hal/driver/test_pciutils_device.cpp)

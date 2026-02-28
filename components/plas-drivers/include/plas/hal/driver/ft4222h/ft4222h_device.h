@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 #include "plas/hal/interface/device.h"
@@ -12,7 +13,7 @@ namespace plas::hal::driver {
 class Ft4222hDevice : public Device, public I2c {
 public:
     explicit Ft4222hDevice(const config::DeviceEntry& entry);
-    ~Ft4222hDevice() override = default;
+    ~Ft4222hDevice() override;
 
     // Device interface
     core::Result<void> Init() override;
@@ -39,11 +40,27 @@ public:
     static void Register();
 
 private:
+    static bool ParseUri(const std::string& uri, uint16_t& master_idx,
+                         uint16_t& slave_idx);
+
+    core::Result<uint16_t> PollSlaveRx(size_t expected_len);
+
     std::string name_;
     std::string uri_;
     DeviceState state_;
+
+    uint16_t master_idx_;
+    uint16_t slave_idx_;
+
+    void* master_handle_;
+    void* slave_handle_;
+
     uint32_t bitrate_;
-    int handle_;
+    uint8_t slave_addr_;
+    uint32_t sys_clock_;
+    uint32_t rx_timeout_ms_;
+    uint32_t rx_poll_interval_us_;
+    std::mutex i2c_mutex_;
 };
 
 }  // namespace plas::hal::driver

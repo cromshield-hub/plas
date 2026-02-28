@@ -40,7 +40,7 @@ cd build && ctest --output-on-failure
 - **Config parsers**: PRIVATE linked, no third-party types in public API
 - **Multi-interface drivers**: Multiple inheritance from pure virtual ABCs
 - **Capability check**: `dynamic_cast` on Device pointer
-- **URI scheme**: `driver://bus:identifier` (aardvark: `aardvark://port:address`, pciutils: `pciutils://DDDD:BB:DD.F`)
+- **URI scheme**: `driver://bus:identifier` (aardvark: `aardvark://port:address`, ft4222h: `ft4222h://master_idx:slave_idx`, pciutils: `pciutils://DDDD:BB:DD.F`)
 - **Optional drivers**: Conditional build via CMake Find modules; missing SDK → driver compiles as stub (`#ifdef PLAS_HAS_*`)
 - **Vendor SDKs**: Bundled in `vendor/` directory (headers + prebuilt libs per platform/arch); searched first, then system paths
 
@@ -148,6 +148,22 @@ plas/
 - **Error mapping**: SDK error codes → `core::ErrorCode` (kIOError, kTimeout, kNotSupported, kDataLoss)
 - **Unit tests**: 33 tests in `test_aardvark_device.cpp` (always built, no SDK required)
 - **Integration tests**: Gated by `PLAS_TEST_AARDVARK_PORT` env var (e.g., `0:0x50`)
+
+## FT4222H Driver (optional, requires FT4222H + D2XX SDK)
+- **Class**: `Ft4222hDevice` — implements `Device`, `I2c`
+- **Driver name**: `"ft4222h"` (config: `driver: ft4222h`)
+- **URI**: `ft4222h://master_idx:slave_idx` (decimal USB device indices, must differ)
+- **Architecture**: Dual-chip master+slave — Master (TX) sends I2C commands, Slave (RX) receives responses via polling
+- **Build flag**: `PLAS_WITH_FT4222H=ON` (default), auto-detected via `FindFT4222H.cmake`
+- **Compile define**: `PLAS_HAS_FT4222H=1` when enabled
+- **SDK dependency**: FT4222H SDK + D2XX (ftd2xx) — both searched by FindFT4222H.cmake
+- **Config args**: `bitrate` (Hz, default 400000), `slave_addr` (7-bit, default 0x40), `sys_clock` (60/24/48/80 MHz, default 60), `rx_timeout_ms` (default 1000), `rx_poll_interval_us` (default 100)
+- **State machine**: kUninitialized → Init (URI validation) → kInitialized → Open (FT_Open both + FT4222_SetClock + I2CMaster_Init + I2CSlave_Init + SetAddress, rollback on failure) → kOpen → Close (UnInitialize + FT_Close both) → kClosed
+- **I2C ops**: Write via master (`FT4222_I2CMaster_Write`), Read via slave polling (`PollSlaveRx` + `FT4222_I2CSlave_Read`), WriteRead = master write + slave poll + slave read — mutex-serialized, length ≤ 0xFFFF
+- **PollSlaveRx**: Deadline-based polling of `FT4222_I2CSlave_GetRxStatus` with configurable timeout/interval
+- **Error mapping**: `MapFtStatus(FT_STATUS)` + `MapFt4222Status(FT4222_STATUS)` → `core::ErrorCode`
+- **Unit tests**: 33 tests in `test_ft4222h_device.cpp` (always built, no SDK required)
+- **Integration tests**: Gated by `PLAS_TEST_FT4222H_PORT` env var (e.g., `0:1`)
 
 ## PciUtils Driver (optional, requires `libpci-dev`)
 - **Class**: `PciUtilsDevice` — implements `Device`, `PciConfig`, `PciDoe`
