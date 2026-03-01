@@ -21,6 +21,8 @@ public:
     DeviceState GetState() const override { return DeviceState::kInitialized; }
     std::string GetName() const override { return "mock_pci_config"; }
     std::string GetUri() const override { return "mock://0:0"; }
+    std::string GetDriverName() const override { return "mock"; }
+    plas::hal::Device* GetDevice() override { return this; }
 
     // PciConfig interface
     core::Result<core::Byte> ReadConfig8(Bdf bdf,

@@ -21,6 +21,8 @@ public:
     DeviceState GetState() const override { return DeviceState::kInitialized; }
     std::string GetName() const override { return "mock_cxl_mailbox"; }
     std::string GetUri() const override { return "mock://0:0"; }
+    std::string GetDriverName() const override { return "mock"; }
+    plas::hal::Device* GetDevice() override { return this; }
 
     // CxlMailbox interface
     core::Result<CxlMailboxResult> ExecuteCommand(

@@ -345,6 +345,14 @@ std::string Ft4222hDevice::GetUri() const {
     return uri_;
 }
 
+std::string Ft4222hDevice::GetDriverName() const {
+    return "ft4222h";
+}
+
+Device* Ft4222hDevice::GetDevice() {
+    return this;
+}
+
 // ---------------------------------------------------------------------------
 // I2c interface
 // ---------------------------------------------------------------------------
@@ -375,7 +383,11 @@ core::Result<size_t> Ft4222hDevice::Write(core::Address addr,
         static_cast<uint16>(length),
         &transferred);
     if (status != FT4222_OK) {
-        return core::Result<size_t>::Err(MapFt4222Status(status));
+        auto err = MapFt4222Status(status);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] Write addr=" + std::to_string(addr) +
+                       " len=" + std::to_string(length) + " failed: " +
+                       make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(transferred));
 #else
@@ -408,6 +420,8 @@ core::Result<size_t> Ft4222hDevice::Read(core::Address addr, core::Byte* data,
     // Poll slave RX buffer until enough data is available
     auto poll_result = PollSlaveRx(length);
     if (poll_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] Read len=" + std::to_string(length) +
+                       " poll failed: " + poll_result.Error().message());
         return core::Result<size_t>::Err(poll_result.Error());
     }
 
@@ -418,7 +432,10 @@ core::Result<size_t> Ft4222hDevice::Read(core::Address addr, core::Byte* data,
         static_cast<uint16>(length),
         &transferred);
     if (status != FT4222_OK) {
-        return core::Result<size_t>::Err(MapFt4222Status(status));
+        auto err = MapFt4222Status(status);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] Read len=" + std::to_string(length) +
+                       " failed: " + make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(transferred));
 #else
@@ -457,12 +474,17 @@ core::Result<size_t> Ft4222hDevice::WriteRead(core::Address addr,
         static_cast<uint16>(write_len),
         &write_transferred);
     if (status != FT4222_OK) {
-        return core::Result<size_t>::Err(MapFt4222Status(status));
+        auto err = MapFt4222Status(status);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] WriteRead addr=" + std::to_string(addr) +
+                       " write phase failed: " + make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
 
     // Poll slave RX buffer
     auto poll_result = PollSlaveRx(read_len);
     if (poll_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] WriteRead addr=" + std::to_string(addr) +
+                       " poll failed: " + poll_result.Error().message());
         return core::Result<size_t>::Err(poll_result.Error());
     }
 
@@ -474,7 +496,10 @@ core::Result<size_t> Ft4222hDevice::WriteRead(core::Address addr,
         static_cast<uint16>(read_len),
         &read_transferred);
     if (status != FT4222_OK) {
-        return core::Result<size_t>::Err(MapFt4222Status(status));
+        auto err = MapFt4222Status(status);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] WriteRead addr=" + std::to_string(addr) +
+                       " read phase failed: " + make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(read_transferred));
 #else

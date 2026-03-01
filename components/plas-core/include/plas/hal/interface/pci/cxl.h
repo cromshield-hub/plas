@@ -1,12 +1,15 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "plas/core/result.h"
 #include "plas/core/types.h"
 #include "plas/hal/interface/pci/cxl_types.h"
 #include "plas/hal/interface/pci/types.h"
+
+namespace plas::hal { class Device; }  // forward declaration
 
 namespace plas::hal::pci {
 
@@ -15,6 +18,9 @@ namespace plas::hal::pci {
 class Cxl {
 public:
     virtual ~Cxl() = default;
+
+    virtual std::string InterfaceName() const { return "Cxl"; }
+    virtual plas::hal::Device* GetDevice() = 0;
 
     /// Enumerate all CXL DVSECs for the given device.
     virtual core::Result<std::vector<DvsecHeader>> EnumerateCxlDvsecs(

@@ -1,10 +1,13 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
 #include "plas/hal/interface/pci/types.h"
 #include "plas/core/result.h"
 #include "plas/core/types.h"
+
+namespace plas::hal { class Device; }  // forward declaration
 
 namespace plas::hal::pci {
 
@@ -12,6 +15,9 @@ namespace plas::hal::pci {
 class PciConfig {
 public:
     virtual ~PciConfig() = default;
+
+    virtual std::string InterfaceName() const { return "PciConfig"; }
+    virtual plas::hal::Device* GetDevice() = 0;
 
     // Typed reads
     virtual core::Result<core::Byte> ReadConfig8(Bdf bdf,

@@ -55,6 +55,14 @@ std::string Pmu3Device::GetUri() const {
     return uri_;
 }
 
+std::string Pmu3Device::GetDriverName() const {
+    return "pmu3";
+}
+
+Device* Pmu3Device::GetDevice() {
+    return this;
+}
+
 // ---------------------------------------------------------------------------
 // PowerControl interface
 // ---------------------------------------------------------------------------

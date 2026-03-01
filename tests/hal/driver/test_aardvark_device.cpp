@@ -62,6 +62,32 @@ TEST(AardvarkDeviceTest, GetNameReturnsNickname) {
     EXPECT_EQ(device.GetName(), "my_device");
 }
 
+TEST(AardvarkDeviceTest, GetNicknameEqualsGetName) {
+    auto entry = MakeEntry("my_device", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    EXPECT_EQ(device.GetNickname(), device.GetName());
+}
+
+TEST(AardvarkDeviceTest, GetDriverNameReturnsAardvark) {
+    auto entry = MakeEntry("dev0", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    EXPECT_EQ(device.GetDriverName(), "aardvark");
+}
+
+TEST(AardvarkDeviceTest, GetDeviceReturnsSelf) {
+    auto entry = MakeEntry("dev0", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    auto* i2c = static_cast<I2c*>(&device);
+    EXPECT_EQ(i2c->GetDevice(), static_cast<Device*>(&device));
+}
+
+TEST(AardvarkDeviceTest, I2cInterfaceName) {
+    auto entry = MakeEntry("dev0", "aardvark://0:0x50");
+    AardvarkDevice device(entry);
+    auto* i2c = static_cast<I2c*>(&device);
+    EXPECT_EQ(i2c->InterfaceName(), "I2c");
+}
+
 TEST(AardvarkDeviceTest, GetUriReturnsUri) {
     auto entry = MakeEntry("dev0", "aardvark://1:0x68");
     AardvarkDevice device(entry);

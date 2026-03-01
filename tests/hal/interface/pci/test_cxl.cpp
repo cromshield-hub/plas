@@ -22,6 +22,8 @@ public:
     DeviceState GetState() const override { return DeviceState::kInitialized; }
     std::string GetName() const override { return "mock_cxl"; }
     std::string GetUri() const override { return "mock://0:0"; }
+    std::string GetDriverName() const override { return "mock"; }
+    plas::hal::Device* GetDevice() override { return this; }
 
     // Cxl interface
     core::Result<std::vector<DvsecHeader>> EnumerateCxlDvsecs(
@@ -115,6 +117,7 @@ TEST(CxlTest, DynamicCastNullForNonCxl) {
         DeviceState GetState() const override { return DeviceState::kInitialized; }
         std::string GetName() const override { return "plain"; }
         std::string GetUri() const override { return "plain://0"; }
+        std::string GetDriverName() const override { return "plain"; }
     };
     auto device = std::make_unique<PlainDevice>();
     auto* cxl = dynamic_cast<Cxl*>(device.get());

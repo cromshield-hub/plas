@@ -2,15 +2,21 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "plas/core/result.h"
 #include "plas/core/types.h"
 
 namespace plas::hal {
 
+class Device;  // forward declaration
+
 class Serial {
 public:
     virtual ~Serial() = default;
+
+    virtual std::string InterfaceName() const { return "Serial"; }
+    virtual Device* GetDevice() = 0;
 
     virtual core::Result<size_t> Read(core::Byte* data, size_t length) = 0;
     virtual core::Result<size_t> Write(const core::Byte* data,

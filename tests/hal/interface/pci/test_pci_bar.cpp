@@ -22,6 +22,8 @@ public:
     DeviceState GetState() const override { return DeviceState::kOpen; }
     std::string GetName() const override { return "mock_pci_bar"; }
     std::string GetUri() const override { return "mock://0:0"; }
+    std::string GetDriverName() const override { return "mock"; }
+    plas::hal::Device* GetDevice() override { return this; }
 
     // PciBar interface
     core::Result<core::DWord> BarRead32(Bdf bdf, uint8_t bar_index,

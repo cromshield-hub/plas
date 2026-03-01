@@ -2,10 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "plas/hal/interface/pci/types.h"
 #include "plas/core/result.h"
 #include "plas/core/types.h"
+
+namespace plas::hal { class Device; }  // forward declaration
 
 namespace plas::hal::pci {
 
@@ -13,6 +16,9 @@ namespace plas::hal::pci {
 class PciBar {
 public:
     virtual ~PciBar() = default;
+
+    virtual std::string InterfaceName() const { return "PciBar"; }
+    virtual plas::hal::Device* GetDevice() = 0;
 
     virtual core::Result<core::DWord> BarRead32(Bdf bdf, uint8_t bar_index,
                                                  uint64_t offset) = 0;

@@ -1,8 +1,12 @@
 #pragma once
 
+#include <string>
+
 #include "plas/core/result.h"
 #include "plas/hal/interface/pci/cxl_types.h"
 #include "plas/hal/interface/pci/types.h"
+
+namespace plas::hal { class Device; }  // forward declaration
 
 namespace plas::hal::pci {
 
@@ -10,6 +14,9 @@ namespace plas::hal::pci {
 class CxlMailbox {
 public:
     virtual ~CxlMailbox() = default;
+
+    virtual std::string InterfaceName() const { return "CxlMailbox"; }
+    virtual plas::hal::Device* GetDevice() = 0;
 
     /// Execute a CXL Mailbox command with a typed opcode.
     virtual core::Result<CxlMailboxResult> ExecuteCommand(

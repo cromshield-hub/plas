@@ -57,6 +57,32 @@ TEST(Ft4222hDeviceTest, GetNameReturnsNickname) {
     EXPECT_EQ(device.GetName(), "my_device");
 }
 
+TEST(Ft4222hDeviceTest, GetNicknameEqualsGetName) {
+    auto entry = MakeEntry("my_device", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    EXPECT_EQ(device.GetNickname(), device.GetName());
+}
+
+TEST(Ft4222hDeviceTest, GetDriverNameReturnsFt4222h) {
+    auto entry = MakeEntry("dev0", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    EXPECT_EQ(device.GetDriverName(), "ft4222h");
+}
+
+TEST(Ft4222hDeviceTest, GetDeviceReturnsSelf) {
+    auto entry = MakeEntry("dev0", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    auto* i2c = static_cast<I2c*>(&device);
+    EXPECT_EQ(i2c->GetDevice(), static_cast<Device*>(&device));
+}
+
+TEST(Ft4222hDeviceTest, I2cInterfaceName) {
+    auto entry = MakeEntry("dev0", "ft4222h://0:1");
+    Ft4222hDevice device(entry);
+    auto* i2c = static_cast<I2c*>(&device);
+    EXPECT_EQ(i2c->InterfaceName(), "I2c");
+}
+
 TEST(Ft4222hDeviceTest, GetUriReturnsUri) {
     auto entry = MakeEntry("dev0", "ft4222h://2:3");
     Ft4222hDevice device(entry);

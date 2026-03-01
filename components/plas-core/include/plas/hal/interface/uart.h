@@ -2,11 +2,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "plas/core/result.h"
 #include "plas/core/types.h"
 
 namespace plas::hal {
+
+class Device;  // forward declaration
 
 enum class Parity {
     kNone,
@@ -17,6 +20,9 @@ enum class Parity {
 class Uart {
 public:
     virtual ~Uart() = default;
+
+    virtual std::string InterfaceName() const { return "Uart"; }
+    virtual Device* GetDevice() = 0;
 
     virtual core::Result<size_t> Read(core::Byte* data, size_t length) = 0;
     virtual core::Result<size_t> Write(const core::Byte* data,

@@ -206,6 +206,14 @@ std::string PciUtilsDevice::GetUri() const {
     return uri_;
 }
 
+std::string PciUtilsDevice::GetDriverName() const {
+    return "pciutils";
+}
+
+plas::hal::Device* PciUtilsDevice::GetDevice() {
+    return this;
+}
+
 // ---------------------------------------------------------------------------
 // PciDevPtr helper
 // ---------------------------------------------------------------------------
@@ -230,6 +238,8 @@ core::Result<core::Byte> PciUtilsDevice::ReadConfig8(
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] ReadConfig8 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<core::Byte>::Err(core::ErrorCode::kIOError);
     }
     auto val = pci_read_byte(dev.get(), offset);
@@ -243,6 +253,8 @@ core::Result<core::Word> PciUtilsDevice::ReadConfig16(
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] ReadConfig16 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<core::Word>::Err(core::ErrorCode::kIOError);
     }
     auto val = pci_read_word(dev.get(), offset);
@@ -257,6 +269,8 @@ core::Result<core::DWord> PciUtilsDevice::ReadConfig32(
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] ReadConfig32 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<core::DWord>::Err(core::ErrorCode::kIOError);
     }
     auto val = pci_read_long(dev.get(), offset);
@@ -275,6 +289,8 @@ core::Result<void> PciUtilsDevice::WriteConfig8(pci::Bdf bdf,
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] WriteConfig8 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<void>::Err(core::ErrorCode::kIOError);
     }
     pci_write_byte(dev.get(), offset, value);
@@ -289,6 +305,8 @@ core::Result<void> PciUtilsDevice::WriteConfig16(pci::Bdf bdf,
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] WriteConfig16 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<void>::Err(core::ErrorCode::kIOError);
     }
     pci_write_word(dev.get(), offset, value);
@@ -303,6 +321,8 @@ core::Result<void> PciUtilsDevice::WriteConfig32(pci::Bdf bdf,
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciConfig] WriteConfig32 offset=" +
+                       std::to_string(offset) + " failed: GetPciDev returned null");
         return core::Result<void>::Err(core::ErrorCode::kIOError);
     }
     pci_write_long(dev.get(), offset, value);
@@ -566,6 +586,7 @@ core::Result<pci::DoePayload> PciUtilsDevice::DoeExchange(
     }
     auto dev = GetPciDev(bdf);
     if (!dev) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciDoe] DoeExchange failed: GetPciDev returned null");
         return core::Result<pci::DoePayload>::Err(core::ErrorCode::kIOError);
     }
 
@@ -728,6 +749,10 @@ core::Result<core::DWord> PciUtilsDevice::BarRead32(
     }
     auto bar_result = EnsureBarMapped(bar_index);
     if (bar_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciBar] BarRead32 bar=" +
+                       std::to_string(bar_index) + " offset=" +
+                       std::to_string(offset) + " failed: " +
+                       make_error_code(bar_result.Error()).message());
         return core::Result<core::DWord>::Err(bar_result.Error());
     }
     auto* bar = bar_result.Value();
@@ -746,6 +771,10 @@ core::Result<core::QWord> PciUtilsDevice::BarRead64(
     }
     auto bar_result = EnsureBarMapped(bar_index);
     if (bar_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciBar] BarRead64 bar=" +
+                       std::to_string(bar_index) + " offset=" +
+                       std::to_string(offset) + " failed: " +
+                       make_error_code(bar_result.Error()).message());
         return core::Result<core::QWord>::Err(bar_result.Error());
     }
     auto* bar = bar_result.Value();
@@ -764,6 +793,10 @@ core::Result<void> PciUtilsDevice::BarWrite32(
     }
     auto bar_result = EnsureBarMapped(bar_index);
     if (bar_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciBar] BarWrite32 bar=" +
+                       std::to_string(bar_index) + " offset=" +
+                       std::to_string(offset) + " failed: " +
+                       make_error_code(bar_result.Error()).message());
         return core::Result<void>::Err(bar_result.Error());
     }
     auto* bar = bar_result.Value();
@@ -783,6 +816,10 @@ core::Result<void> PciUtilsDevice::BarWrite64(
     }
     auto bar_result = EnsureBarMapped(bar_index);
     if (bar_result.IsError()) {
+        PLAS_LOG_ERROR("[" + name_ + "][PciBar] BarWrite64 bar=" +
+                       std::to_string(bar_index) + " offset=" +
+                       std::to_string(offset) + " failed: " +
+                       make_error_code(bar_result.Error()).message());
         return core::Result<void>::Err(bar_result.Error());
     }
     auto* bar = bar_result.Value();

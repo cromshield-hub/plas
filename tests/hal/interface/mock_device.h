@@ -41,6 +41,7 @@ public:
     DeviceState GetState() const override { return state_; }
     std::string GetName() const override { return name_; }
     std::string GetUri() const override { return uri_; }
+    std::string GetDriverName() const override { return "mock"; }
 
 private:
     std::string name_;

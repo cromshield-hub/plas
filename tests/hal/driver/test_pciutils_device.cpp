@@ -5,6 +5,7 @@
 #include "plas/hal/driver/pciutils/pciutils_device.h"
 #include "plas/hal/interface/device.h"
 #include "plas/hal/interface/device_factory.h"
+#include "plas/hal/interface/pci/pci_bar.h"
 #include "plas/hal/interface/pci/pci_config.h"
 #include "plas/hal/interface/pci/pci_doe.h"
 
@@ -64,6 +65,39 @@ TEST(PciUtilsDeviceTest, GetNameReturnsNickname) {
     auto entry = MakeEntry("my_device", "pciutils://0000:02:00.0");
     PciUtilsDevice device(entry);
     EXPECT_EQ(device.GetName(), "my_device");
+}
+
+TEST(PciUtilsDeviceTest, GetNicknameEqualsGetName) {
+    auto entry = MakeEntry("my_device", "pciutils://0000:02:00.0");
+    PciUtilsDevice device(entry);
+    EXPECT_EQ(device.GetNickname(), device.GetName());
+}
+
+TEST(PciUtilsDeviceTest, GetDriverNameReturnsPciutils) {
+    auto entry = MakeEntry("dev0", "pciutils://0000:03:00.0");
+    PciUtilsDevice device(entry);
+    EXPECT_EQ(device.GetDriverName(), "pciutils");
+}
+
+TEST(PciUtilsDeviceTest, GetDeviceReturnsSelfViaPciConfig) {
+    auto entry = MakeEntry("dev0", "pciutils://0000:03:00.0");
+    PciUtilsDevice device(entry);
+    auto* pci_cfg = static_cast<pci::PciConfig*>(&device);
+    EXPECT_EQ(pci_cfg->GetDevice(), static_cast<Device*>(&device));
+}
+
+TEST(PciUtilsDeviceTest, GetDeviceReturnsSelfViaPciBar) {
+    auto entry = MakeEntry("dev0", "pciutils://0000:03:00.0");
+    PciUtilsDevice device(entry);
+    auto* pci_bar = static_cast<pci::PciBar*>(&device);
+    EXPECT_EQ(pci_bar->GetDevice(), static_cast<Device*>(&device));
+}
+
+TEST(PciUtilsDeviceTest, PciConfigInterfaceName) {
+    auto entry = MakeEntry("dev0", "pciutils://0000:03:00.0");
+    PciUtilsDevice device(entry);
+    auto* pci_cfg = static_cast<pci::PciConfig*>(&device);
+    EXPECT_EQ(pci_cfg->InterfaceName(), "PciConfig");
 }
 
 TEST(PciUtilsDeviceTest, GetUriReturnsUri) {

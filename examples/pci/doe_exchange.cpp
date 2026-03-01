@@ -48,6 +48,8 @@ public:
     }
     std::string GetName() const override { return "stub_pci"; }
     std::string GetUri() const override { return "stub://0:0"; }
+    std::string GetDriverName() const override { return "stub"; }
+    plas::hal::Device* GetDevice() override { return this; }
 
     // PciConfig — stub reads/writes
     plas::core::Result<plas::core::Byte> ReadConfig8(

@@ -22,6 +22,10 @@ public:
     DeviceState GetState() const override;
     std::string GetName() const override;
     std::string GetUri() const override;
+    std::string GetDriverName() const override;
+
+    // PowerControl/SsdGpio interfaces — GetDevice() (one impl satisfies both)
+    Device* GetDevice() override;
 
     // PowerControl interface
     core::Result<void> SetVoltage(core::Voltage voltage) override;

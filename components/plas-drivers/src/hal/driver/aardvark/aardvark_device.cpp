@@ -343,6 +343,14 @@ std::string AardvarkDevice::GetUri() const {
     return uri_;
 }
 
+std::string AardvarkDevice::GetDriverName() const {
+    return "aardvark";
+}
+
+Device* AardvarkDevice::GetDevice() {
+    return this;
+}
+
 // ---------------------------------------------------------------------------
 // I2c interface
 // ---------------------------------------------------------------------------
@@ -366,7 +374,11 @@ core::Result<size_t> AardvarkDevice::Read(core::Address addr,
     int result = aa_i2c_read(bus_state_->handle, static_cast<uint16_t>(addr),
                              flags, static_cast<uint16_t>(length), data);
     if (result < 0) {
-        return core::Result<size_t>::Err(MapAardvarkError(result));
+        auto err = MapAardvarkError(result);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] Read addr=" + std::to_string(addr) +
+                       " len=" + std::to_string(length) + " failed: " +
+                       make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(result));
 #else
@@ -397,7 +409,11 @@ core::Result<size_t> AardvarkDevice::Write(core::Address addr,
     int result = aa_i2c_write(bus_state_->handle, static_cast<uint16_t>(addr),
                               flags, static_cast<uint16_t>(length), data);
     if (result < 0) {
-        return core::Result<size_t>::Err(MapAardvarkError(result));
+        auto err = MapAardvarkError(result);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] Write addr=" + std::to_string(addr) +
+                       " len=" + std::to_string(length) + " failed: " +
+                       make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(result));
 #else
@@ -435,7 +451,12 @@ core::Result<size_t> AardvarkDevice::WriteRead(core::Address addr,
                                    static_cast<uint16_t>(read_len),
                                    read_data);
     if (result < 0) {
-        return core::Result<size_t>::Err(MapAardvarkError(result));
+        auto err = MapAardvarkError(result);
+        PLAS_LOG_ERROR("[" + name_ + "][I2c] WriteRead addr=" + std::to_string(addr) +
+                       " wlen=" + std::to_string(write_len) +
+                       " rlen=" + std::to_string(read_len) + " failed: " +
+                       make_error_code(err).message());
+        return core::Result<size_t>::Err(err);
     }
     return core::Result<size_t>::Ok(static_cast<size_t>(result));
 #else

@@ -25,6 +25,10 @@ public:
     DeviceState GetState() const override;
     std::string GetName() const override;
     std::string GetUri() const override;
+    std::string GetDriverName() const override;
+
+    // I2c interface — GetDevice()
+    Device* GetDevice() override;
 
     // I2c interface
     core::Result<size_t> Read(core::Address addr, core::Byte* data,

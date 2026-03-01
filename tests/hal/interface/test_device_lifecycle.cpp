@@ -2,6 +2,7 @@
 
 #include "mock_device.h"
 #include "plas/core/error.h"
+#include "plas/hal/interface/i2c.h"
 
 namespace plas::hal {
 namespace {
@@ -119,6 +120,17 @@ TEST(DeviceLifecycleTest, GetNameReturnsConstructorValue) {
 TEST(DeviceLifecycleTest, GetUriReturnsConstructorValue) {
     MockDevice dev("my_device", "test://1:0x50");
     EXPECT_EQ(dev.GetUri(), "test://1:0x50");
+}
+
+TEST(DeviceLifecycleTest, GetNicknameEqualsGetName) {
+    MockDevice dev("nickname_test", "test://0:0");
+    EXPECT_EQ(dev.GetNickname(), dev.GetName());
+    EXPECT_EQ(dev.GetNickname(), "nickname_test");
+}
+
+TEST(DeviceLifecycleTest, GetDriverNameReturnsMock) {
+    MockDevice dev("test", "test://0");
+    EXPECT_EQ(dev.GetDriverName(), "mock");
 }
 
 // --- Full lifecycle cycle ---

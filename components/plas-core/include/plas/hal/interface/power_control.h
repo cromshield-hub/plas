@@ -1,13 +1,20 @@
 #pragma once
 
+#include <string>
+
 #include "plas/core/result.h"
 #include "plas/core/units.h"
 
 namespace plas::hal {
 
+class Device;  // forward declaration
+
 class PowerControl {
 public:
     virtual ~PowerControl() = default;
+
+    virtual std::string InterfaceName() const { return "PowerControl"; }
+    virtual Device* GetDevice() = 0;
 
     virtual core::Result<void> SetVoltage(core::Voltage voltage) = 0;
     virtual core::Result<core::Voltage> GetVoltage() = 0;

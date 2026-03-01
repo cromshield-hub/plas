@@ -41,6 +41,10 @@ public:
     DeviceState GetState() const override;
     std::string GetName() const override;
     std::string GetUri() const override;
+    std::string GetDriverName() const override;
+
+    // PciConfig/PciDoe/PciBar interfaces — GetDevice() (one impl satisfies all)
+    plas::hal::Device* GetDevice() override;
 
     // -- PciConfig interface --------------------------------------------------
     core::Result<core::Byte> ReadConfig8(pci::Bdf bdf,
