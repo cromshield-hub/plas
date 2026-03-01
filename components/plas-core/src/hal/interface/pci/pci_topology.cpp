@@ -8,6 +8,7 @@
 #include <regex>
 #include <sstream>
 
+#include <dirent.h>
 #include <sys/stat.h>
 
 #include "plas/core/error.h"
@@ -263,6 +264,45 @@ core::Result<std::optional<PciAddress>> PciTopology::FindParent(
     // Second-to-last is the parent
     return core::Result<std::optional<PciAddress>>::Ok(
         path_addrs[path_addrs.size() - 2]);
+}
+
+core::Result<std::vector<PciAddress>> PciTopology::FindChildren(
+    const PciAddress& bridge_addr) {
+    std::string sysfs_path = GetSysfsPath(bridge_addr);
+
+    // Check that the device exists
+    struct stat st;
+    if (::stat(sysfs_path.c_str(), &st) != 0) {
+        return core::Result<std::vector<PciAddress>>::Err(
+            core::ErrorCode::kNotFound);
+    }
+
+    // Pattern: DDDD:BB:DD.F
+    static const std::regex bdf_pattern(
+        "[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\\.[0-7]",
+        std::regex::icase);
+
+    std::vector<PciAddress> children;
+
+    DIR* dir = ::opendir(sysfs_path.c_str());
+    if (dir == nullptr) {
+        // Device exists but directory can't be opened — return empty
+        return core::Result<std::vector<PciAddress>>::Ok(std::move(children));
+    }
+
+    struct dirent* entry = nullptr;
+    while ((entry = ::readdir(dir)) != nullptr) {
+        std::string name(entry->d_name);
+        if (std::regex_match(name, bdf_pattern)) {
+            auto result = PciAddress::FromString(name);
+            if (result.IsOk()) {
+                children.push_back(result.Value());
+            }
+        }
+    }
+    ::closedir(dir);
+
+    return core::Result<std::vector<PciAddress>>::Ok(std::move(children));
 }
 
 core::Result<PciAddress> PciTopology::FindRootPort(const PciAddress& addr) {

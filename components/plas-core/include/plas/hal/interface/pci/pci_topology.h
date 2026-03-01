@@ -36,6 +36,12 @@ public:
     static core::Result<std::optional<PciAddress>> FindParent(
         const PciAddress& addr);
 
+    /// Enumerate direct child devices under a bridge or root port.
+    /// Returns empty vector if the device has no children (endpoint).
+    /// Returns kNotFound if the device does not exist in sysfs.
+    static core::Result<std::vector<PciAddress>> FindChildren(
+        const PciAddress& bridge_addr);
+
     /// Find the root port by traversing up the topology.
     static core::Result<PciAddress> FindRootPort(const PciAddress& addr);
 
