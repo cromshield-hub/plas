@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
@@ -455,6 +456,100 @@ TEST_F(PciTopologyTest, GetDeviceInfoNoPcieCap) {
     ASSERT_TRUE(result.IsOk());
     EXPECT_EQ(result.Value().port_type, PciePortType::kUnknown);
     EXPECT_FALSE(result.Value().is_bridge);
+}
+
+// ===== FindChildren Tests =====
+
+TEST_F(PciTopologyTest, FindChildrenSingleChild) {
+    // Topology: root_port(0000:00:01.0) → endpoint(0000:01:00.0)
+    CreateFakeDevice({"0000:00:01.0"}, 0x01, PciePortType::kRootPort);
+    CreateFakeDevice({"0000:00:01.0", "0000:01:00.0"}, 0x00,
+                     PciePortType::kEndpoint);
+
+    PciAddress bridge{0x0000, {0x00, 0x01, 0x00}};
+    auto result = PciTopology::FindChildren(bridge);
+    ASSERT_TRUE(result.IsOk());
+    ASSERT_EQ(result.Value().size(), 1u);
+
+    PciAddress expected_child{0x0000, {0x01, 0x00, 0x00}};
+    EXPECT_EQ(result.Value()[0], expected_child);
+}
+
+TEST_F(PciTopologyTest, FindChildrenMultiple) {
+    // Bridge with 3 children
+    CreateFakeDevice({"0000:00:01.0"}, 0x01, PciePortType::kRootPort);
+    CreateFakeDevice({"0000:00:01.0", "0000:01:00.0"}, 0x00,
+                     PciePortType::kEndpoint);
+    CreateFakeDevice({"0000:00:01.0", "0000:01:00.1"}, 0x00,
+                     PciePortType::kEndpoint);
+    CreateFakeDevice({"0000:00:01.0", "0000:01:00.2"}, 0x00,
+                     PciePortType::kEndpoint);
+
+    PciAddress bridge{0x0000, {0x00, 0x01, 0x00}};
+    auto result = PciTopology::FindChildren(bridge);
+    ASSERT_TRUE(result.IsOk());
+    ASSERT_EQ(result.Value().size(), 3u);
+
+    // Sort by string for deterministic comparison (readdir order varies)
+    auto children = result.Value();
+    std::sort(children.begin(), children.end(),
+              [](const PciAddress& a, const PciAddress& b) {
+                  return a.ToString() < b.ToString();
+              });
+
+    EXPECT_EQ(children[0], (PciAddress{0x0000, {0x01, 0x00, 0x00}}));
+    EXPECT_EQ(children[1], (PciAddress{0x0000, {0x01, 0x00, 0x01}}));
+    EXPECT_EQ(children[2], (PciAddress{0x0000, {0x01, 0x00, 0x02}}));
+}
+
+TEST_F(PciTopologyTest, FindChildrenEndpoint) {
+    // Endpoint has no children — should return empty vector (not error)
+    CreateFakeDevice({"0000:00:01.0", "0000:01:00.0"}, 0x00,
+                     PciePortType::kEndpoint);
+
+    PciAddress endpoint{0x0000, {0x01, 0x00, 0x00}};
+    auto result = PciTopology::FindChildren(endpoint);
+    ASSERT_TRUE(result.IsOk());
+    EXPECT_TRUE(result.Value().empty());
+}
+
+TEST_F(PciTopologyTest, FindChildrenNotFound) {
+    // Nonexistent device → kNotFound error
+    PciAddress nonexistent{0x0000, {0x99, 0x00, 0x00}};
+    auto result = PciTopology::FindChildren(nonexistent);
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST_F(PciTopologyTest, FindChildrenEmptyBridge) {
+    // Bridge exists but has no child BDF subdirectories
+    CreateFakeDevice({"0000:00:02.0"}, 0x01, PciePortType::kRootPort);
+
+    PciAddress bridge{0x0000, {0x00, 0x02, 0x00}};
+    auto result = PciTopology::FindChildren(bridge);
+    ASSERT_TRUE(result.IsOk());
+    EXPECT_TRUE(result.Value().empty());
+}
+
+TEST_F(PciTopologyTest, FindChildrenDeepTopology) {
+    // Switch: root_port → upstream → downstream → endpoint
+    // Verify FindChildren on downstream returns the endpoint only
+    std::vector<std::string> segments = {"0000:3a:00.0", "0000:3b:00.0",
+                                         "0000:3c:08.0", "0000:41:00.0"};
+    std::vector<std::pair<uint8_t, PciePortType>> types = {
+        {0x01, PciePortType::kRootPort},
+        {0x01, PciePortType::kUpstreamPort},
+        {0x01, PciePortType::kDownstreamPort},
+        {0x00, PciePortType::kEndpoint},
+    };
+    CreateTopology(segments, types);
+
+    PciAddress downstream{0x0000, {0x3c, 0x08, 0x00}};
+    auto result = PciTopology::FindChildren(downstream);
+    ASSERT_TRUE(result.IsOk());
+    ASSERT_EQ(result.Value().size(), 1u);
+
+    PciAddress expected{0x0000, {0x41, 0x00, 0x00}};
+    EXPECT_EQ(result.Value()[0], expected);
 }
 
 TEST_F(PciTopologyTest, FindRootPortDirectChild) {

@@ -191,8 +191,34 @@ plas/
   - `RemoveDevice` / `RescanBridge` / `RescanAll` — sysfs remove/rescan writes
   - `SetSysfsRoot` — override for unit testing with fake sysfs
 - **Config space parsing**: reads binary `/sys/bus/pci/devices/DDDD:BB:DD.F/config` for header type (offset 0x0E) and PCIe capability chain walking (cap ID 0x10, port type bits [7:4])
-- **Unit tests**: 22 tests with fake sysfs directory structure (`test_pci_topology.cpp`)
+- **Unit tests**: 23 tests with fake sysfs directory structure (`test_pci_topology.cpp`)
 - **Integration tests**: Gated by `PLAS_TEST_PCI_TOPOLOGY_BDF` env var (`test_pci_topology_integration.cpp`)
+
+## PciDevice (sysfs-based facade)
+- **Class**: `PciDevice` — concrete sysfs-based facade providing config space, BAR MMIO, and topology access through a single move-only object
+- **Header**: `components/plas-core/include/plas/hal/interface/pci/pci_device.h`
+- **Source**: `components/plas-core/src/hal/interface/pci/pci_device.cpp`
+- **Target**: `plas_hal_interface` (no extra dependencies — pure sysfs file I/O)
+- **Factory**: `PciDevice::Open(PciAddress)` / `Open(string)` — verifies sysfs existence, caches device info
+- **Move-only**: owns config fd + mmap'd BARs; non-copyable
+- **Config space**: `ReadConfig8/16/32`, `WriteConfig8/16/32` — lazy `open()` of sysfs `/config`, then `pread()`/`pwrite()`
+- **Capability walking**: `FindCapability(CapabilityId)`, `FindExtCapability(ExtCapabilityId)` — self-contained, uses own config reads
+- **BAR MMIO**: `BarRead32/64`, `BarWrite32/64`, `BarReadBuffer`, `BarWriteBuffer` — lazy mmap of sysfs `resourceN`, cached per bar_index
+- **Topology**: `FindParent()`, `FindChildren()`, `FindRootPort()`, `GetPathToRoot()` — delegates to `PciTopology`, returns `PciDevice` objects (not raw addresses)
+- **Lifecycle**: `Remove()`, `Rescan()` — sysfs writes
+- **No Bdf parameter**: PciDevice knows its own address — all methods are parameter-free (vs. PciConfig/PciBar ABCs that require Bdf)
+- **Relationship to PciUtilsDevice**: PciDevice is a standalone facade for direct sysfs access. PciUtilsDevice is a Bootstrap-managed driver using libpci. Both coexist — PciDevice is for quick topology exploration, PciUtilsDevice for managed device lifecycle
+- **Usage example**:
+  ```cpp
+  auto dev = PciDevice::Open("0000:03:00.0").Value();
+  auto vid = dev.ReadConfig16(0x00);    // vendor ID
+  auto bar = dev.BarRead32(0, 0x14);    // BAR0 MMIO
+  auto parent = dev.FindParent();       // → optional<PciDevice>
+  for (auto& child : dev.FindChildren().Value()) {
+      auto cid = child.ReadConfig16(0x00);
+  }
+  ```
+- **Unit tests**: 34 tests with fake sysfs (`test_pci_device.cpp`) — Open, DeviceInfo, Config R/W, Capability walking, BAR MMIO, Topology, Lifecycle, Move semantics
 
 ## Vendor SDK Management
 - **Location**: `vendor/<sdk>/include/` (headers) + `vendor/<sdk>/<platform>/<arch>/` (prebuilt libs)

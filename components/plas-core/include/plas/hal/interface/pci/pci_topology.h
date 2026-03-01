@@ -61,6 +61,9 @@ public:
     /// Override sysfs root for unit testing (default: "/sys").
     static void SetSysfsRoot(const std::string& root);
 
+    /// Get the current sysfs root (for PciDevice to share).
+    static const std::string& GetSysfsRoot();
+
 private:
     static std::string sysfs_root_;
 

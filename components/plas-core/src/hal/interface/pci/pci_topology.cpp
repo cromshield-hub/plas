@@ -212,6 +212,10 @@ void PciTopology::SetSysfsRoot(const std::string& root) {
     sysfs_root_ = root;
 }
 
+const std::string& PciTopology::GetSysfsRoot() {
+    return sysfs_root_;
+}
+
 std::string PciTopology::GetSysfsPath(const PciAddress& addr) {
     return sysfs_root_ + "/bus/pci/devices/" + addr.ToString();
 }

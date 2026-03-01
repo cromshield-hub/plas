@@ -77,6 +77,7 @@ add_library(plas_hal_interface
     src/hal/interface/device_factory.cpp
     src/hal/device_manager.cpp
     src/hal/interface/pci/pci_topology.cpp
+    src/hal/interface/pci/pci_device.cpp
 )
 add_library(plas::hal_interface ALIAS plas_hal_interface)
 

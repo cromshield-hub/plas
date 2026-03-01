@@ -101,6 +101,11 @@ target_link_libraries(test_pci_topology
     PRIVATE plas::hal_interface GTest::gtest_main)
 gtest_discover_tests(test_pci_topology)
 
+add_executable(test_pci_device hal/interface/pci/test_pci_device.cpp)
+target_link_libraries(test_pci_device
+    PRIVATE plas::hal_interface GTest::gtest_main)
+gtest_discover_tests(test_pci_device)
+
 add_executable(test_pci_topology_integration
     hal/interface/pci/test_pci_topology_integration.cpp)
 target_link_libraries(test_pci_topology_integration
